@@ -546,3 +546,52 @@ class TestValidationReport:
         s = str(i)
         assert "🔴" in s
         assert "TEST" in s
+
+
+# ======================================================================== #
+# 13. Kaedra ContinuityTracker & Teleological Planning
+# ======================================================================== #
+
+class TestKaedraContinuityTracker:
+    def test_continuity_state_updates(self):
+        from nougenscript import ContinuityTracker
+
+        tracker = ContinuityTracker()
+        sc1 = Scene(
+            heading="INT. CORRIDOR - NIGHT",
+            nodes=[
+                Dialogue(character="CORBIN", text="I have the key and the drive.", parenthetical="grimacing"),
+            ]
+        )
+        tracker.update_from_scene(sc1)
+
+        assert tracker.last_location == "INT. CORRIDOR - NIGHT"
+        assert "key" in tracker.somatic_props
+        assert "drive" in tracker.somatic_props
+        assert tracker.character_states["CORBIN"] == "grimacing"
+
+        prompt = tracker.context_prompt()
+        assert "CONTINUITY CONSTRAINTS:" in prompt
+        assert "key" in prompt
+        assert "INT. CORRIDOR - NIGHT" in prompt
+
+
+class TestKaedraBackwardPlan:
+    def test_generate_backward_plan(self):
+        from nougenscript import generate_backward_plan
+
+        plan = generate_backward_plan(
+            title="Operation Shadow Fall",
+            terminal_climax="Corbin burns the archive to prevent the uplink.",
+            opening_ground="Corbin receives an encrypted ping at midnight."
+        )
+
+        assert plan.title == "Operation Shadow Fall"
+        assert "burns the archive" in plan.terminal_climax
+        assert len(plan.steps) == 4
+        phases = [s.phase for s in plan.steps]
+        assert "TERMINAL_ATTRACTOR" in phases
+        assert "VERIFICATION_PROOF" in phases
+        assert "SURGICAL_MUTATION" in phases
+        assert "CAUSAL_ANCHOR" in phases
+

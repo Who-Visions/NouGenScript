@@ -1,6 +1,7 @@
 """NouGenScript: Universal AI Screenplay & Dual-Plane Dramatic Script Engine."""
 
 from nougenscript.core import (
+    ContinuityTracker,
     Cue,
     Dialogue,
     Direction,
@@ -61,14 +62,17 @@ from nougenscript.narrative_craft import (
 )
 from nougenscript.spite import SpiteProfile, SubtextAnalysisResult, SubtextAnalyzer
 from nougenscript.templates import (
+    BackwardStep,
     BeatEntry,
     CircleStep,
     EmailTemplate,
+    TeleologicalNarrativePlan,
     ThirtyActEntry,
     TransitionAnnotation,
     UnityOutline,
     VideoTemplateOutput,
     generate_bab_template,
+    generate_backward_plan,
     generate_beat_sheet,
     generate_hso_template,
     generate_pas_template,
@@ -100,7 +104,7 @@ from nougenscript.validators import (
     VideoRetentionValidator,
 )
 
-__version__ = "0.6.0"
+__version__ = "0.7.0"
 __all__ = [
     # Core AST
     "Audience",
@@ -114,6 +118,7 @@ __all__ = [
     "CodeScriptSpec",
     "ComicPage",
     "ComicPanel",
+    "ContinuityTracker",
     "CreatorVideoScript",
     "Cue",
     "Dialogue",
@@ -180,14 +185,17 @@ __all__ = [
     "ValidationReport",
     "VideoRetentionValidator",
     # Templates & Scaffolds
+    "BackwardStep",
     "BeatEntry",
     "CircleStep",
     "EmailTemplate",
+    "TeleologicalNarrativePlan",
     "ThirtyActEntry",
     "TransitionAnnotation",
     "UnityOutline",
     "VideoTemplateOutput",
     "generate_bab_template",
+    "generate_backward_plan",
     "generate_beat_sheet",
     "generate_hso_template",
     "generate_pas_template",

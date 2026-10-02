@@ -449,3 +449,55 @@ def generate_thirty_act_scaffold(title: str = "Untitled Epic",
         ThirtyActEntry(30, "The Grand Finale", "META_CLOSER", "Closing Credits & Post-Credits Seal",
                        f"Final thematic image. Closing audio motif. The definitive authorial seal on {title}.", "3 min"),
     ]
+
+
+# ======================================================================== #
+# 8. Backward-Causal Teleological Planning (from Kaedra VeilEngine)
+# ======================================================================== #
+
+@dataclass
+class BackwardStep:
+    step_number: int
+    phase: str  # TERMINAL_ATTRACTOR | VERIFICATION_PROOF | SURGICAL_MUTATION | CAUSAL_ANCHOR
+    state_description: str
+    dramatic_requirement: str
+
+
+@dataclass
+class TeleologicalNarrativePlan:
+    title: str
+    terminal_climax: str
+    steps: list[BackwardStep]
+
+
+def generate_backward_plan(title: str = "Untitled Feature",
+                           terminal_climax: str = "The protagonist destroys the central machine by sacrificing their own neural implant.",
+                           opening_ground: str = "A low-level technician living under the quiet surveillance state.") -> TeleologicalNarrativePlan:
+    """Solves narrative backwards from the ending to prune all speculative filler."""
+    steps = [
+        BackwardStep(
+            step_number=4,
+            phase="TERMINAL_ATTRACTOR",
+            state_description=f"Locked End Condition: {terminal_climax}",
+            dramatic_requirement="The climax is non-negotiable. Every preceding scene must be an inescapable domino leading here."
+        ),
+        BackwardStep(
+            step_number=3,
+            phase="VERIFICATION_PROOF",
+            state_description="Proof of Cost: The sacrifice must be physically and emotionally permanent.",
+            dramatic_requirement="Ensure protagonist has no alternative exit (no deus ex machina, no hidden backup)."
+        ),
+        BackwardStep(
+            step_number=2,
+            phase="SURGICAL_MUTATION",
+            state_description="The Threshold Inversion: Protagonist gains the specific knowledge or artifact required to reach the machine.",
+            dramatic_requirement="Every ally and defense stripped away. The discovery in Act II points directly to this mechanism."
+        ),
+        BackwardStep(
+            step_number=1,
+            phase="CAUSAL_ANCHOR",
+            state_description=f"The Baseline Reality: {opening_ground}",
+            dramatic_requirement="Establish the initial flaw or dependency that makes the future sacrifice meaningful."
+        ),
+    ]
+    return TeleologicalNarrativePlan(title=title, terminal_climax=terminal_climax, steps=steps)

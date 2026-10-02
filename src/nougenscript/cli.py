@@ -43,6 +43,7 @@ from nougenscript import (
     generate_short_form_reel_template,
     generate_youtube_longform_template,
     generate_thirty_act_scaffold,
+    generate_backward_plan,
 )
 
 
@@ -108,12 +109,14 @@ def main(argv: list[str] | None = None) -> int:
     p_val.add_argument("--json", action="store_true", help="Output validation report as JSON")
 
     # 8. Generate — Scaffold generators
-    p_gen = sub.add_parser("generate", help="Generate elite framework scaffolds (beat-sheet, circle, email, play, video, reel, youtube, thirty-acts).")
-    p_gen.add_argument("template", choices=["beat-sheet", "story-circle", "pas", "bab", "hso", "unity-play", "talking-head", "reel", "youtube", "thirty-acts"],
+    p_gen = sub.add_parser("generate", help="Generate elite framework scaffolds (beat-sheet, circle, email, play, video, reel, youtube, thirty-acts, backward-plan).")
+    p_gen.add_argument("template", choices=["beat-sheet", "story-circle", "pas", "bab", "hso", "unity-play", "talking-head", "reel", "youtube", "thirty-acts", "backward-plan"],
                        help="Template to generate")
     p_gen.add_argument("--title", default="Untitled", help="Project title")
     p_gen.add_argument("--protagonist", default="HERO", help="Protagonist name (for story-circle or thirty-acts)")
     p_gen.add_argument("--shadow", default="THE SHADOW", help="Antagonist / Shadow self (for thirty-acts)")
+    p_gen.add_argument("--terminal-climax", default="The protagonist destroys the central machine by sacrificing their own neural implant.", help="Terminal climax (for backward-plan)")
+    p_gen.add_argument("--opening-ground", default="A low-level technician living under the quiet surveillance state.", help="Opening ground (for backward-plan)")
     p_gen.add_argument("--topic", default="your challenge", help="Topic (for email or video templates)")
     p_gen.add_argument("--location", default="A cramped apartment kitchen", help="Location (for unity-play)")
     p_gen.add_argument("--json", action="store_true", help="Output as JSON")
@@ -417,6 +420,24 @@ def main(argv: list[str] | None = None) -> int:
                         print(f"\n  [{current_phase}]")
                     print(f"    Act {a.act_number:2d}: {a.act_name} ({a.pacing_target})")
                     print(f"            ↳ {a.story_beat}: {a.description}")
+
+        elif tmpl == "backward-plan":
+            plan = generate_backward_plan(
+                title=args.title,
+                terminal_climax=args.terminal_climax,
+                opening_ground=args.opening_ground,
+            )
+            if args.json:
+                from dataclasses import asdict
+                print(json.dumps(asdict(plan), indent=2))
+            else:
+                print(f"🔮 Backward-Causal Teleological Plan (Kaedra Engine) — \"{plan.title}\"")
+                print(f"   🎯 Terminal Climax: {plan.terminal_climax}")
+                print("=" * 65)
+                for s in plan.steps:
+                    print(f"\n  [Step {s.step_number}: {s.phase}]")
+                    print(f"    • State:       {s.state_description}")
+                    print(f"    • Requirement: {s.dramatic_requirement}")
 
         return 0
 

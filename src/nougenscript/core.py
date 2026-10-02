@@ -89,6 +89,11 @@ class Scene:
         current_char = ""
         current_paren = None
         for node in self.nodes:
+            if isinstance(node, Dialogue):
+                results.append(node)
+                continue
+            if not hasattr(node, "type"):
+                continue
             if node.type == NodeType.CHARACTER:
                 current_char = node.content.strip()
                 current_paren = None
@@ -134,3 +139,48 @@ class Screenplay:
     def from_fountain(cls, text: str, title: str = "Untitled Screenplay") -> Screenplay:
         from nougenscript.parser import FountainParser
         return FountainParser.parse(text, title=title)
+
+
+# --------------------------------------------------------------------------- #
+# Kaedra Continuity State Machine
+# --------------------------------------------------------------------------- #
+
+@dataclass
+class ContinuityTracker:
+    """Live state machine tracking active plot threads, somatic props, emotions, and locations across scenes."""
+    active_threads: list[str] = field(default_factory=list)
+    somatic_props: list[str] = field(default_factory=list)
+    emotional_state: str = "determined, focused"
+    last_location: str = ""
+    character_states: dict[str, str] = field(default_factory=dict)
+
+    def update_from_scene(self, scene: Scene):
+        """Extracts and updates continuity from scene headings and node contents."""
+        self.last_location = scene.heading
+        scene_text = scene.heading + " " + " ".join(
+            (n.text if hasattr(n, "text") else getattr(n, "content", "")) for n in scene.nodes
+        )
+        lower = scene_text.lower()
+
+        # Update character states from dialogues
+        for d in scene.dialogues:
+            if d.parenthetical:
+                self.character_states[d.character] = d.parenthetical
+
+        # Auto-detect props and threads
+        prop_keywords = ["weapon", "key", "armor", "file", "drive", "device", "token", "serum", "shard", "sword"]
+        for p in prop_keywords:
+            if p in lower and p not in self.somatic_props:
+                self.somatic_props.append(p)
+
+    def context_prompt(self) -> str:
+        """Returns dense context string for next scene generation."""
+        props_str = ", ".join(self.somatic_props[-4:]) if self.somatic_props else "None"
+        threads_str = ", ".join(self.active_threads[-3:]) if self.active_threads else "Standard Progression"
+        return (
+            f"CONTINUITY CONSTRAINTS:\n"
+            f"- Prior Location: {self.last_location or 'Beginning'}\n"
+            f"- Somatic Props in Play: {props_str}\n"
+            f"- Active Threads: {threads_str}\n"
+            f"- Baseline Emotional Cadence: {self.emotional_state}"
+        )
