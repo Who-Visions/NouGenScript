@@ -40,9 +40,40 @@ from nougenscript.persona import (
     resolve,
 )
 from nougenscript.spite import SpiteProfile, SubtextAnalysisResult, SubtextAnalyzer
+from nougenscript.templates import (
+    BeatEntry,
+    CircleStep,
+    EmailTemplate,
+    TransitionAnnotation,
+    UnityOutline,
+    generate_bab_template,
+    generate_beat_sheet,
+    generate_hso_template,
+    generate_pas_template,
+    generate_story_circle,
+    generate_unity_outline,
+)
+from nougenscript.validators import (
+    AristotleUnitiesValidator,
+    AwarenessStage,
+    BeatSheetValidator,
+    BeatType,
+    CausalConnector,
+    CausalMomentumValidator,
+    DeterministicDiffGate,
+    HarmonCircleValidator,
+    HarmonStep,
+    McCloudTransitionValidator,
+    PanelTransition,
+    SchwartzAwarenessValidator,
+    ScriptValidator,
+    ValidationIssue,
+    ValidationReport,
+)
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 __all__ = [
+    # Core AST
     "Audience",
     "BEHAVIORAL_MASKS",
     "CharacterPersona",
@@ -82,6 +113,32 @@ __all__ = [
     "get_mask",
     "list_masks",
     "resolve",
+    # v0.4.0 — Validators
+    "AristotleUnitiesValidator",
+    "AwarenessStage",
+    "BeatSheetValidator",
+    "BeatType",
+    "CausalConnector",
+    "CausalMomentumValidator",
+    "DeterministicDiffGate",
+    "HarmonCircleValidator",
+    "HarmonStep",
+    "McCloudTransitionValidator",
+    "PanelTransition",
+    "SchwartzAwarenessValidator",
+    "ScriptValidator",
+    "ValidationIssue",
+    "ValidationReport",
+    # v0.4.0 — Templates
+    "BeatEntry",
+    "CircleStep",
+    "EmailTemplate",
+    "TransitionAnnotation",
+    "UnityOutline",
+    "generate_bab_template",
+    "generate_beat_sheet",
+    "generate_hso_template",
+    "generate_pas_template",
+    "generate_story_circle",
+    "generate_unity_outline",
 ]
-
-

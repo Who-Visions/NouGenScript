@@ -2,7 +2,8 @@
 """NouGenScript Command-Line Interface.
 
 Universal script compiler, dual-plane prompter, psychological depth engine,
-OpenClap (.clap) bundler, and poly-script dialect router:
+OpenClap (.clap) bundler, poly-script dialect router, elite validators, and
+scaffold generators:
 - Movies, TV episodes, Playwrights, Comic books, Emails, TypeScript, JavaScript, Python.
 """
 from __future__ import annotations
@@ -26,6 +27,14 @@ from nougenscript import (
     list_masks,
     resolve,
     Signals,
+    # v0.4.0 validators + templates
+    ScriptValidator,
+    generate_beat_sheet,
+    generate_story_circle,
+    generate_pas_template,
+    generate_bab_template,
+    generate_hso_template,
+    generate_unity_outline,
 )
 
 
@@ -77,6 +86,24 @@ def main(argv: list[str] | None = None) -> int:
     p_poly.add_argument("--lang", default="python", help="Language for code scripts (typescript, javascript, python, bash)")
     p_poly.add_argument("--json", action="store_true", help="Output JSON summary")
 
+    # 7. Validate (v0.4.0) — Elite quality gates
+    p_val = sub.add_parser("validate", help="Run top .001%% narrative validators on a script.")
+    p_val.add_argument("type", choices=["movie", "tv", "play", "comic", "email", "code", "typescript", "javascript", "python"],
+                       help="Script dialect to validate")
+    p_val.add_argument("file", type=Path, help="Script source file")
+    p_val.add_argument("--title", default="Untitled", help="Project title")
+    p_val.add_argument("--json", action="store_true", help="Output validation report as JSON")
+
+    # 8. Generate (v0.4.0) — Scaffold generators
+    p_gen = sub.add_parser("generate", help="Generate elite framework scaffolds (beat-sheet, circle, email, play).")
+    p_gen.add_argument("template", choices=["beat-sheet", "story-circle", "pas", "bab", "hso", "unity-play"],
+                       help="Template to generate")
+    p_gen.add_argument("--title", default="Untitled", help="Project title")
+    p_gen.add_argument("--protagonist", default="HERO", help="Protagonist name (for story-circle)")
+    p_gen.add_argument("--topic", default="your challenge", help="Topic (for email templates)")
+    p_gen.add_argument("--location", default="A cramped apartment kitchen", help="Location (for unity-play)")
+    p_gen.add_argument("--json", action="store_true", help="Output as JSON")
+
     args = parser.parse_args(argv)
 
     if args.command == "parse":
@@ -87,7 +114,7 @@ def main(argv: list[str] | None = None) -> int:
         else:
             print(f"🎬 Screenplay: {len(sp.scenes)} scenes, {len(sp.dialogue_lines)} dialogue lines, hash={sp.script_hash}")
             for sc in sp.scenes:
-                print(f"  • {sc.heading} ({len(sc.dialogue)} lines)")
+                print(f"  • {sc.heading} ({len(sc.dialogues)} lines)")
         return 0
 
     if args.command == "dual-plane":
@@ -205,6 +232,116 @@ def main(argv: list[str] | None = None) -> int:
             elif "code" in poly_obj.meta.domain.value.lower():
                 code_spec = poly_obj.body
                 print(f"  💻 Code Language: {code_spec.language.upper()} (Deps: {code_spec.dependencies}, Exports: {code_spec.exports})")
+        return 0
+
+    # ------------------------------------------------------------------- #
+    # v0.4.0 — Validate
+    # ------------------------------------------------------------------- #
+    if args.command == "validate":
+        content = args.file.read_text(encoding="utf-8")
+        t = args.type.lower()
+
+        # Parse into PolyScript first
+        if t == "movie":
+            poly_obj = PolyScript(
+                meta=__import__("nougenscript.dialects", fromlist=["ScriptMeta"]).ScriptMeta(
+                    title=args.title, kind=__import__("nougenscript.dialects", fromlist=["ScriptKind"]).ScriptKind.MOVIE_SCREENPLAY
+                ),
+                body=FountainParser.parse(content, title=args.title),
+                raw_source=content,
+            )
+        elif t == "tv":
+            poly_obj = UniversalScriptEngine.parse_tv_script(content, title=args.title)
+        elif t == "play":
+            poly_obj = UniversalScriptEngine.parse_play(content, title=args.title)
+        elif t == "comic":
+            poly_obj = UniversalScriptEngine.parse_comic_script(content, title=args.title)
+        elif t == "email":
+            poly_obj = UniversalScriptEngine.parse_email_script(content, title=args.title)
+        else:
+            effective_lang = t if t in {"typescript", "javascript", "python"} else "python"
+            poly_obj = UniversalScriptEngine.parse_code_script(content, language=effective_lang, entrypoint=args.file.stem)
+
+        reports = ScriptValidator.validate(poly_obj)
+
+        if args.json:
+            from dataclasses import asdict
+            print(json.dumps([{
+                "validator": r.validator_name, "passed": r.passed,
+                "score": r.score, "issues": [asdict(i) for i in r.issues],
+                "metadata": r.metadata,
+            } for r in reports], indent=2, default=str))
+        else:
+            print(ScriptValidator.full_report(poly_obj))
+        return 0
+
+    # ------------------------------------------------------------------- #
+    # v0.4.0 — Generate scaffolds
+    # ------------------------------------------------------------------- #
+    if args.command == "generate":
+        tmpl = args.template
+
+        if tmpl == "beat-sheet":
+            beats = generate_beat_sheet(title=args.title)
+            if args.json:
+                print(json.dumps([{"beat": b.beat.value, "page": b.page_target,
+                                   "description": b.description, "hint": b.scene_hint} for b in beats], indent=2))
+            else:
+                print(f"🎬 Save the Cat! Beat Sheet — \"{args.title}\"")
+                print("=" * 50)
+                for b in beats:
+                    print(f"  [{b.page_target}] {b.beat.value.upper()}")
+                    print(f"    {b.description}")
+                    if b.scene_hint:
+                        print(f"    💡 {b.scene_hint}")
+
+        elif tmpl == "story-circle":
+            steps = generate_story_circle(protagonist=args.protagonist, episode_title=args.title)
+            if args.json:
+                print(json.dumps([{"step": s.step.value, "position": s.position,
+                                   "description": s.description, "prompt": s.writing_prompt} for s in steps], indent=2))
+            else:
+                print(f"📺 Harmon Story Circle — \"{args.title}\" (Protagonist: {args.protagonist})")
+                print("=" * 50)
+                for s in steps:
+                    print(f"  [{s.position}] {s.step.value.upper()}")
+                    print(f"    {s.description}")
+                    if s.writing_prompt:
+                        print(f"    ✏️ {s.writing_prompt}")
+
+        elif tmpl in {"pas", "bab", "hso"}:
+            gen_fn = {"pas": generate_pas_template, "bab": generate_bab_template, "hso": generate_hso_template}[tmpl]
+            email = gen_fn(topic=args.topic)
+            if args.json:
+                print(json.dumps({"framework": email.framework, "awareness": email.awareness_stage.value,
+                                  "subject": email.subject_line, "sections": email.sections,
+                                  "ps": email.ps_line, "sign_off": email.sign_off}, indent=2))
+            else:
+                print(f"✉️ {email.framework} Email Template — Topic: \"{args.topic}\"")
+                print(f"  Subject: {email.subject_line}")
+                print(f"  Awareness: {email.awareness_stage.value}")
+                for sec in email.sections:
+                    print(f"  [{sec['label']}] {sec['content']}")
+                print(f"  P.S.: {email.ps_line}")
+                print(f"  Sign-off: {email.sign_off}")
+
+        elif tmpl == "unity-play":
+            outline = generate_unity_outline(title=args.title, location=args.location)
+            if args.json:
+                print(json.dumps({"title": outline.title, "location": outline.single_location,
+                                  "time_span": outline.time_span, "core_action": outline.core_action,
+                                  "characters": outline.characters,
+                                  "acts": outline.act_structure}, indent=2))
+            else:
+                print(f"🎭 Aristotle Unity Play — \"{outline.title}\"")
+                print(f"  📍 Location: {outline.single_location}")
+                print(f"  ⏱️ Time: {outline.time_span}")
+                print(f"  ❓ Core Question: {outline.core_action}")
+                print(f"  👥 Characters: {', '.join(outline.characters)}")
+                for act in outline.act_structure:
+                    print(f"\n  {act['act']}")
+                    print(f"    {act['description']}")
+
         return 0
 
     return 0
