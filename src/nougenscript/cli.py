@@ -15,6 +15,10 @@ from pathlib import Path
 from nougenscript import (
     DualPlaneProjector,
     FountainParser,
+    MasterCraftSuite,
+    MametAuditor,
+    StatusTracker,
+    CadenceAnalyzer,
     OpenClapSerializer,
     PolyScript,
     Screenplay,
@@ -30,6 +34,11 @@ from nougenscript import (
 
 
 def main(argv: list[str] | None = None) -> int:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8")
+
     parser = argparse.ArgumentParser(
         prog="nougenscript",
         description="Universal Poly-Script Engine: Movies, TV, Plays, Comics, Emails, TypeScript, JavaScript, Python."
@@ -76,6 +85,16 @@ def main(argv: list[str] | None = None) -> int:
     p_poly.add_argument("--title", default="Untitled PolyScript", help="Project title")
     p_poly.add_argument("--lang", default="python", help="Language for code scripts (typescript, javascript, python, bash)")
     p_poly.add_argument("--json", action="store_true", help="Output JSON summary")
+
+    # 7. Top 0.001% Master Craft Audit (Mamet, Cadence, Causality, Status, Recursion)
+    p_craft = sub.add_parser("craft", help="Run top 0.001% master craft audit (Mamet, Sorkin cadence, causality, status).")
+    p_craft.add_argument("file", type=Path, help="Path to screenplay file")
+    p_craft.add_argument("--json", action="store_true", help="Output JSON structured report")
+
+    # 8. Status Transaction Map
+    p_stat = sub.add_parser("status-map", help="Map line-by-line power transactions and peripeteia status reversals.")
+    p_stat.add_argument("file", type=Path, help="Path to screenplay file")
+    p_stat.add_argument("--json", action="store_true", help="Output JSON status trace")
 
     args = parser.parse_args(argv)
 
@@ -205,6 +224,50 @@ def main(argv: list[str] | None = None) -> int:
             elif "code" in poly_obj.meta.domain.value.lower():
                 code_spec = poly_obj.body
                 print(f"  💻 Code Language: {code_spec.language.upper()} (Deps: {code_spec.dependencies}, Exports: {code_spec.exports})")
+        return 0
+
+    if args.command == "craft":
+        text = args.file.read_text(encoding="utf-8")
+        sp = FountainParser.parse(text)
+        report = MasterCraftSuite.audit(sp)
+        if args.json:
+            print(json.dumps(report.__dict__, indent=2))
+        else:
+            print(f"🏆 Top 0.001% Narrative Master Craft Audit ({args.file.name}):")
+            print(f"  • Overall Craft Score:     {report.overall_craft_index}/100")
+            print(f"  • Mamet Triad Compliance:  {int(report.mamet_compliance_ratio * 100)}% ({report.total_scenes} scenes)")
+            print(f"  • Sorkin Cadence Score:    {report.cadence_score}/100 ({report.total_dialogues} dialogue turns)")
+            print(f"  • Causal Velocity Ratio:   {int(report.causal_velocity_ratio * 100)}% ('Therefore'/'But' vs 'And then')")
+            print(f"  • Status Power Reversals:  {report.status_reversals} peripeteia pivot(s)")
+            if report.critical_notes:
+                print("\n  ⚠️ Critical Director/Writer Punch-List:")
+                for note in report.critical_notes:
+                    print(f"    - {note}")
+            else:
+                print("\n  ✨ Elite Diamond Standard: 0.001% Narrative propulsion verified.")
+        return 0
+
+    if args.command == "status-map":
+        text = args.file.read_text(encoding="utf-8")
+        sp = FountainParser.parse(text)
+        res = StatusTracker.analyze_dialogues(sp.dialogue_lines)
+        if args.json:
+            print(json.dumps({
+                "characters": res.characters,
+                "reversals": res.reversals_detected,
+                "dominant": res.dominant_character,
+                "submissive": res.submissive_character,
+                "final_balance": res.final_balance,
+                "turns": [t.__dict__ for t in res.turns],
+            }, indent=2, default=str))
+        else:
+            print(f"🎭 Status Transaction Dynamics ({len(res.turns)} turns, {res.reversals_detected} reversals):")
+            print(f"  • Dominant:   {res.dominant_character} (Score: {res.final_balance.get(res.dominant_character, 0):+d})")
+            print(f"  • Submissive: {res.submissive_character} (Score: {res.final_balance.get(res.submissive_character, 0):+d})")
+            print("\n  Line-by-Line Power Negotiation:")
+            for turn in res.turns:
+                move_str = f"[{turn.move.value}]"
+                print(f"    {turn.character:12} {move_str:15} (Bal: {turn.cumulative_status:+d}) \"{turn.line}\"")
         return 0
 
     return 0
