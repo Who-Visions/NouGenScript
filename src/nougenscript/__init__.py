@@ -60,6 +60,13 @@ from nougenscript.narrative_craft import (
     StatusTransactionResult,
     StatusTurn,
 )
+from nougenscript.instincts import Instinct, InstinctRecorder
+from nougenscript.sandwich import (
+    ReasoningSandwich,
+    SandwichExecutionResult,
+    SandwichPass,
+    SandwichStep,
+)
 from nougenscript.spite import SpiteProfile, SubtextAnalysisResult, SubtextAnalyzer
 from nougenscript.templates import (
     BackwardStep,
@@ -104,7 +111,7 @@ from nougenscript.validators import (
     VideoRetentionValidator,
 )
 
-__version__ = "0.7.0"
+__version__ = "0.8.0"
 __all__ = [
     # Core AST
     "Audience",
@@ -131,6 +138,8 @@ __all__ = [
     "EmotionState",
     "FountainParser",
     "InformationState",
+    "Instinct",
+    "InstinctRecorder",
     "MametAuditResult",
     "MametAuditor",
     "MaskBlend",
@@ -140,8 +149,12 @@ __all__ = [
     "OpenClapSerializer",
     "Persona",
     "PolyScript",
+    "ReasoningSandwich",
     "RecurseTracer",
     "RecursiveMotif",
+    "SandwichExecutionResult",
+    "SandwichPass",
+    "SandwichStep",
     "Scene",
     "Screenplay",
     "ScriptDomain",

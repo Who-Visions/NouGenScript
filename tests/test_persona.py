@@ -17,13 +17,19 @@ from nougenscript.persona import (
 
 
 def test_20_pack_masks_completeness():
-    assert len(BEHAVIORAL_MASKS) == 20
+    assert len(BEHAVIORAL_MASKS) == 25
     masks = list_masks()
     assert "charming" in masks
     assert "stoic" in masks
     assert "gremlin" in masks
     assert "villain" in masks
     assert "genius" in masks
+    # Dav1d Hip-Hop Mogul Voice Masks
+    assert "sosa" in masks
+    assert "curtis" in masks
+    assert "ye" in masks
+    assert "hov" in masks
+    assert "lupe" in masks
 
 
 def test_mask_blend_prompt_stack():

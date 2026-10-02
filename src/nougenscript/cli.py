@@ -44,6 +44,8 @@ from nougenscript import (
     generate_youtube_longform_template,
     generate_thirty_act_scaffold,
     generate_backward_plan,
+    InstinctRecorder,
+    ReasoningSandwich,
 )
 
 
@@ -130,6 +132,20 @@ def main(argv: list[str] | None = None) -> int:
     p_stat = sub.add_parser("status-map", help="Map line-by-line power transactions and peripeteia status reversals.")
     p_stat.add_argument("file", type=Path, help="Path to screenplay file")
     p_stat.add_argument("--json", action="store_true", help="Output JSON status trace")
+
+    # 11. Reasoning Sandwich (Dav1d 11-step audit loop)
+    p_sand = sub.add_parser("sandwich", help="Run Dav1d's 11-step prompt reasoning sandwich on a script.")
+    p_sand.add_argument("file", type=Path, help="Path to screenplay file")
+    p_sand.add_argument("--spec", default="Feature-length cinematic screenplay audit", help="Target outcome specification")
+    p_sand.add_argument("--json", action="store_true", help="Output JSON audit trace")
+
+    # 12. Instinct Recorder & Memory
+    p_inst = sub.add_parser("instinct", help="Query or record adaptive behavioral instincts.")
+    p_inst.add_argument("action", choices=["list", "record", "context"], help="Action to perform")
+    p_inst.add_argument("--category", default=None, help="Instinct category (e.g. dialogue, pacing)")
+    p_inst.add_argument("--pattern", default=None, help="Trigger pattern (for record)")
+    p_inst.add_argument("--response", default=None, help="Reflex response (for record)")
+    p_inst.add_argument("--confidence", type=float, default=0.5, help="Confidence score")
 
     args = parser.parse_args(argv)
 
@@ -483,6 +499,48 @@ def main(argv: list[str] | None = None) -> int:
             for turn in res.turns:
                 move_str = f"[{turn.move.value}]"
                 print(f"    {turn.character:12} {move_str:15} (Bal: {turn.cumulative_status:+d}) \"{turn.line}\"")
+        return 0
+
+    if args.command == "sandwich":
+        text = args.file.read_text(encoding="utf-8")
+        result = ReasoningSandwich.audit_script_outcome(spec=args.spec, script_text=text)
+        if args.json:
+            from dataclasses import asdict
+            print(json.dumps(asdict(result), indent=2))
+        else:
+            status_icon = "✅ PASSED" if result.overall_passed else "❌ FAILED"
+            print(f"🥪 Dav1d 11-Step Reasoning Sandwich — {status_icon}")
+            print(f"   Target: \"{result.target_spec}\" (Hash: {result.sandwich_hash})")
+            print("=" * 65)
+            for p in result.passes:
+                step_badge = "🟢" if p.status == "passed" else ("🟡" if p.status == "warning" else "🔴")
+                print(f"  {step_badge} [{p.step.value}] {p.summary}")
+            print("\n  🎯 Synthesis:")
+            print(f"    {result.synthesis}")
+        return 0 if result.overall_passed else 1
+
+    if args.command == "instinct":
+        recorder = InstinctRecorder()
+        act = args.action
+        if act == "record":
+            if not args.pattern or not args.response:
+                print("⚠️ Error: --pattern and --response required for record.")
+                return 1
+            inst = recorder.record_instinct(
+                category=args.category or "general",
+                pattern=args.pattern,
+                response=args.response,
+                confidence=args.confidence
+            )
+            print(f"🧠 Recorded Instinct #{inst.id}: [{inst.category}] '{inst.pattern}' -> '{inst.response}' (conf: {inst.confidence:.2f})")
+        elif act == "list":
+            instincts = recorder.get_instincts(category=args.category)
+            print(f"🧠 Adaptive Instincts ({len(instincts)} total):")
+            for i in instincts:
+                print(f"  • #{i.id:2d} [{i.category}] '{i.pattern}' -> '{i.response}' (conf: {i.confidence:.2f}, used: {i.usage_count}x)")
+        elif act == "context":
+            prompt = recorder.build_constraint_context(category=args.category)
+            print(prompt if prompt else "No high-confidence instincts recorded yet.")
         return 0
 
     return 0

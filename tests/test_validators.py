@@ -595,3 +595,66 @@ class TestKaedraBackwardPlan:
         assert "SURGICAL_MUTATION" in phases
         assert "CAUSAL_ANCHOR" in phases
 
+
+# ======================================================================== #
+# 14. Dav1d InstinctRecorder & 11-Step Reasoning Sandwich
+# ======================================================================== #
+
+class TestDav1dInstinctRecorder:
+    def test_bayesian_confidence_update(self):
+        from nougenscript import InstinctRecorder
+
+        recorder = InstinctRecorder(db_path=":memory:")
+        inst1 = recorder.record_instinct(
+            category="anti_cliche",
+            pattern="Well that just happened",
+            response="Purge MCU quip and replace with heavy somatic silence.",
+            confidence=0.5
+        )
+        assert inst1.confidence == 0.5
+        assert inst1.usage_count == 1
+
+        # Second observation triggers Bayesian convergence
+        inst2 = recorder.record_instinct(
+            category="anti_cliche",
+            pattern="Well that just happened",
+            response="Purge MCU quip and replace with heavy somatic silence.",
+            confidence=0.5
+        )
+        assert inst2.confidence > 0.5
+        assert inst2.usage_count == 2
+
+        matched = recorder.match_feedback("Actor said: well that just happened in the lab.")
+        assert len(matched) == 1
+        assert matched[0].pattern == "Well that just happened"
+
+        prompt = recorder.build_constraint_context()
+        assert "LEARNED BEHAVIORAL INSTINCTS:" in prompt
+        assert "Purge MCU quip" in prompt
+
+
+class TestDav1dReasoningSandwich:
+    def test_script_outcome_audit(self):
+        from nougenscript import ReasoningSandwich
+
+        script = """Title: Test Film
+Author: Dav3
+
+INT. ARCHIVE - NIGHT
+
+CORBIN
+The resonance burns through my collar.
+
+XOAH
+Endure it. Nothing comes free.
+"""
+        res = ReasoningSandwich.audit_script_outcome(
+            spec="Feature Noir scene compliance",
+            script_text=script
+        )
+        assert res.overall_passed is True
+        assert len(res.passes) == 11
+        assert res.sandwich_hash != ""
+        assert "Scenes:" in res.synthesis
+
+
