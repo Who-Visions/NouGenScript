@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """NouGenScript Command-Line Interface.
 
-Handles script parsing, dual-plane decomposition, SPITE psychological depth analysis,
-OpenClap (.clap) bundling, and deterministic persona resolution with behavioral masks.
+Universal script compiler, dual-plane prompter, psychological depth engine,
+OpenClap (.clap) bundler, and poly-script dialect router:
+- Movies, TV episodes, Playwrights, Comic books, Emails, TypeScript, JavaScript, Python.
 """
 from __future__ import annotations
 
@@ -12,29 +13,30 @@ import sys
 from pathlib import Path
 
 from nougenscript import (
-    Screenplay,
-    FountainParser,
     DualPlaneProjector,
+    FountainParser,
     OpenClapSerializer,
+    PolyScript,
+    Screenplay,
     SpiteProfile,
     SubtextAnalyzer,
-    CharacterPersona,
-    Signals,
+    UniversalScriptEngine,
     blend,
     get_emotion,
     list_masks,
     resolve,
+    Signals,
 )
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="nougenscript",
-        description="Universal Screenplay, Dual-Plane Prompter & Dramatic Persona Engine."
+        description="Universal Poly-Script Engine: Movies, TV, Plays, Comics, Emails, TypeScript, JavaScript, Python."
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
-    # 1. Parse Fountain / Screenplay
+    # 1. Parse Fountain / Movie Screenplay
     p_parse = sub.add_parser("parse", help="Parse Fountain or screenplay text into AST nodes.")
     p_parse.add_argument("file", type=Path, help="Path to screenplay file (.fountain, .txt)")
     p_parse.add_argument("--json", action="store_true", help="Output AST in JSON")
@@ -65,6 +67,15 @@ def main(argv: list[str] | None = None) -> int:
     p_persona.add_argument("--emotion", help="Set active emotional state (e.g. ecstatic, anxious, enraged)")
     p_persona.add_argument("--character", help="Generate prompt directives for character persona")
     p_persona.add_argument("--json", action="store_true", help="Output JSON structured format")
+
+    # 6. Poly-Script Dialects (TV, Comic, Play, Email, Code)
+    p_poly = sub.add_parser("poly", help="Compile or inspect poly-script formats (tv, play, comic, email, code).")
+    p_poly.add_argument("type", choices=["tv", "play", "comic", "email", "code", "typescript", "javascript", "python"],
+                        help="Target script dialect")
+    p_poly.add_argument("file", type=Path, help="Script source file")
+    p_poly.add_argument("--title", default="Untitled PolyScript", help="Project title")
+    p_poly.add_argument("--lang", default="python", help="Language for code scripts (typescript, javascript, python, bash)")
+    p_poly.add_argument("--json", action="store_true", help="Output JSON summary")
 
     args = parser.parse_args(argv)
 
@@ -150,6 +161,50 @@ def main(argv: list[str] | None = None) -> int:
         else:
             print(f"🎭 Resolved Persona: audience={p.audience}, market={p.market}, register={p.register}")
             print(p.system_prompt())
+        return 0
+
+    if args.command == "poly":
+        content = args.file.read_text(encoding="utf-8")
+        t = args.type.lower()
+        poly_obj: PolyScript
+
+        if t == "tv":
+            poly_obj = UniversalScriptEngine.parse_tv_script(content, title=args.title)
+        elif t == "play":
+            poly_obj = UniversalScriptEngine.parse_play(content, title=args.title)
+        elif t == "comic":
+            poly_obj = UniversalScriptEngine.parse_comic_script(content, title=args.title)
+        elif t == "email":
+            poly_obj = UniversalScriptEngine.parse_email_script(content, title=args.title)
+        elif t in {"code", "typescript", "javascript", "python"}:
+            effective_lang = "typescript" if t == "typescript" else ("javascript" if t == "javascript" else ("python" if t == "python" else args.lang))
+            poly_obj = UniversalScriptEngine.parse_code_script(content, language=effective_lang, entrypoint=args.file.stem)
+        else:
+            print(f"Unsupported script dialect: {t}")
+            return 1
+
+        if args.json:
+            print(json.dumps({
+                "summary": poly_obj.summary(),
+                "meta": poly_obj.meta.__dict__,
+                "hash": poly_obj.script_hash
+            }, indent=2, default=str))
+        else:
+            print(f"📜 {poly_obj.summary()}")
+            if poly_obj.meta.kind.value == "tv_episodic":
+                print(f"  📺 TV Acts: {len(poly_obj.body)}")
+                for act in poly_obj.body:
+                    print(f"    • {act.act_name}: {len(act.scenes)} scene(s)")
+            elif poly_obj.meta.kind.value == "comic_script":
+                print(f"  💥 Comic Pages: {len(poly_obj.body)}")
+                for p in poly_obj.body:
+                    print(f"    • Page {p.page_number}: {len(p.panels)} panel(s)")
+            elif poly_obj.meta.kind.value == "cold_email":
+                em = poly_obj.body
+                print(f"  ✉️ Email Subject: \"{em.subject_line}\" (CTA: {em.call_to_action_text} -> {em.call_to_action_url})")
+            elif "code" in poly_obj.meta.domain.value.lower():
+                code_spec = poly_obj.body
+                print(f"  💻 Code Language: {code_spec.language.upper()} (Deps: {code_spec.dependencies}, Exports: {code_spec.exports})")
         return 0
 
     return 0

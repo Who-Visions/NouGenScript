@@ -1,4 +1,4 @@
-# 📜 NouGenScript: Universal AI Screenplay & Dual-Plane Dramatic Script Engine
+# 📜 NouGenScript: Universal Poly-Script Engine
 
 > **Organization**: Who-Visions & NouGenAi  
 > **Status**: Production Core Standard  
@@ -7,24 +7,27 @@
 ---
 
 ## 🏛️ Prime Purpose & Vision
-**NouGenScript** is the unified, mathematically grounded dramatic screenplay, playwriting, and voice-teleprompter script engine for the NouGen fleet and Veilverse cinematic productions.
+**NouGenScript** is the universal, mathematically grounded script engine for the NouGen fleet, Veilverse productions, marketing infrastructure, and engineering workflows.
 
-It combines:
-1. **Dual-Plane Script Architecture (`DisplayPlane != SpeechPlane`)**:
+It handles **all script paradigms under one unified AST**:
+1. **Movie Screenplays**: Feature screenplays, Scene Headings (`INT./EXT.`), action beats, transitions, and dual-plane prompter streams.
+2. **Television Scripts**: Episodic TV, pilots, cold opens, multi-act structures (`ACT ONE` $\dots$ `ACT FIVE`), and tag stingers.
+3. **Playwriting & Theatre**: Stage plays, proscenium and black-box stage directions, character entrances/exits, and monologues.
+4. **Comic Book Scripts**: Page-by-page, panel-by-panel comic scripts with visual descriptions, dialogue balloons, captions, and SFX.
+5. **Email Outreach Scripts**: Marketing, cold outreach, and nurture sequences (Subject lines, Preview headers, Body, CTA buttons, and P.S. lines).
+6. **Code Scripts (TypeScript, JavaScript, Python, Bash)**: Engineering scripts with syntax encapsulation, dependency detection, export tracking, and AST metadata.
+7. **Dual-Plane Script Architecture (`DisplayPlane != SpeechPlane`)**:
    - Authored scripts decompose bijectively into talent-facing display elements (`DIRECTION`, `CUE`, `PAUSE`, `MEDIA`) and speech-recognition / voice-synthesis stream tokens (`SPOKEN`).
-2. **SPITE Psychological Depth Engine**:
+8. **SPITE Psychological Depth Engine**:
    - Character shadow-self tracking, volatility indices ($0.0 \dots 1.0$), teleological core motives, and subtext leakage detection across lines.
-3. **Deterministic Persona & Behavioral Masks (`persona.py`)**:
+9. **Deterministic Persona & Behavioral Masks (`persona.py`)**:
    - Audience / writer persona resolution with deterministic SHA-256 fingerprinting.
    - 20-Pack composable behavioral masks (`stoic`, `villain`, `witty`, `charming`, `gremlin`, etc.) for director/actor prompts.
    - 20-Pack emotional spectrum (`ecstatic` $\dots$ `enraged`) for delivery cues and somatic inflection.
-   - Character persona contract with taboo enforcement and vocabulary register bounds.
-4. **OpenClap Interchange Format (`.clap`)**:
+10. **OpenClap Interchange Format (`.clap`)**:
    - Universal multi-document YAML serialization compatible with OpenClap multi-track audio-visual timelines (video, dialogue, sound, music).
-5. **Fountain & Screenplay Syntax Parser**:
-   - Full parser for Scene Headings (`INT./EXT.`), Characters, Parentheticals, Dialogue, Transitions, and Action beats.
-6. **Command-Line Interface (`nougenscript`)**:
-   - CLI for parsing, dual-plane projection, SPITE subtext evaluation, OpenClap bundling, and persona mask composition.
+11. **Command-Line Interface (`nougenscript`)**:
+   - Unified CLI for parsing, poly-dialect compilation, dual-plane projection, SPITE subtext evaluation, OpenClap bundling, and persona mask composition.
 
 ---
 
@@ -98,17 +101,28 @@ nougenscript export-clap script.fountain -o scene1.clap
 
 # Compose behavioral masks
 nougenscript persona --blend stoic witty --emotion ecstatic --character XOAH
+
+# Compile and inspect PolyScript dialects (TV, Comic, Play, Email, Code)
+nougenscript poly tv episode1.tv
+nougenscript poly comic issue1.comic
+nougenscript poly play hamlet_act1.play
+nougenscript poly email outreach_sequence.txt
+nougenscript poly typescript app.ts
+nougenscript poly python daemon.py
 ```
 
 ---
 
 ## 📦 File Architecture
 - `src/nougenscript/core.py`: Canonical AST nodes (`Scene`, `Dialogue`, `Direction`, `Cue`).
+- `src/nougenscript/dialects.py`: PolyScript domain matrix (`NARRATIVE_FILM`, `TELEVISION`, `THEATRE`, `COMIC_BOOK`, `EMAIL_CAMPAIGN`, `CODE_TYPESCRIPT`, `CODE_JAVASCRIPT`, `CODE_PYTHON`, `CODE_SHELL`).
+- `src/nougenscript/engine.py`: Universal poly-script compiler, parser, and code encapsulator.
 - `src/nougenscript/dual_plane.py`: Bijective Display vs Speech plane projector and word anchor locator.
 - `src/nougenscript/spite.py`: SPITE psychological depth, character profiling, and subtext analyzer.
 - `src/nougenscript/persona.py`: Signals, deterministic persona resolver, 20 behavioral masks, 20 emotions, and character contract.
 - `src/nougenscript/openclap.py`: Universal `.clap` multi-document YAML stream serializer and parser.
 - `src/nougenscript/parser.py`: Fast, deterministic Fountain and text screenplay parser.
-- `src/nougenscript/cli.py`: Unified command-line interface.
-- `tests/`: Complete pytest test suite verifying all parser, dual-plane, SPITE, and persona invariants.
+- `src/nougenscript/cli.py`: Unified command-line interface with `poly` multi-dialect support.
+- `tests/`: Complete pytest test suite verifying all parser, dual-plane, SPITE, persona, and poly-dialect invariants.
+
 
