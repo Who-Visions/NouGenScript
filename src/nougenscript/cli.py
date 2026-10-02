@@ -31,7 +31,7 @@ from nougenscript import (
     list_masks,
     resolve,
     Signals,
-    # v0.4.0 validators + templates
+    # v0.4.0 & v0.5.0 validators + templates
     ScriptValidator,
     generate_beat_sheet,
     generate_story_circle,
@@ -39,6 +39,9 @@ from nougenscript import (
     generate_bab_template,
     generate_hso_template,
     generate_unity_outline,
+    generate_talking_head_template,
+    generate_short_form_reel_template,
+    generate_youtube_longform_template,
 )
 
 
@@ -86,30 +89,30 @@ def main(argv: list[str] | None = None) -> int:
     p_persona.add_argument("--character", help="Generate prompt directives for character persona")
     p_persona.add_argument("--json", action="store_true", help="Output JSON structured format")
 
-    # 6. Poly-Script Dialects (TV, Comic, Play, Email, Code)
-    p_poly = sub.add_parser("poly", help="Compile or inspect poly-script formats (tv, play, comic, email, code).")
-    p_poly.add_argument("type", choices=["tv", "play", "comic", "email", "code", "typescript", "javascript", "python"],
+    # 6. Poly-Script Dialects (TV, Comic, Play, Email, Code, Creator Video)
+    p_poly = sub.add_parser("poly", help="Compile or inspect poly-script formats (tv, play, comic, email, video, reel, youtube, code).")
+    p_poly.add_argument("type", choices=["tv", "play", "comic", "email", "video", "reel", "youtube", "code", "typescript", "javascript", "python"],
                         help="Target script dialect")
     p_poly.add_argument("file", type=Path, help="Script source file")
     p_poly.add_argument("--title", default="Untitled PolyScript", help="Project title")
     p_poly.add_argument("--lang", default="python", help="Language for code scripts (typescript, javascript, python, bash)")
     p_poly.add_argument("--json", action="store_true", help="Output JSON summary")
 
-    # 7. Validate (v0.4.0) — Elite quality gates
+    # 7. Validate — Elite quality gates (Screenplay, TV, Comic, Email, Video, Code)
     p_val = sub.add_parser("validate", help="Run top .001%% narrative validators on a script.")
-    p_val.add_argument("type", choices=["movie", "tv", "play", "comic", "email", "code", "typescript", "javascript", "python"],
+    p_val.add_argument("type", choices=["movie", "tv", "play", "comic", "email", "video", "reel", "youtube", "code", "typescript", "javascript", "python"],
                        help="Script dialect to validate")
     p_val.add_argument("file", type=Path, help="Script source file")
     p_val.add_argument("--title", default="Untitled", help="Project title")
     p_val.add_argument("--json", action="store_true", help="Output validation report as JSON")
 
-    # 8. Generate (v0.4.0) — Scaffold generators
-    p_gen = sub.add_parser("generate", help="Generate elite framework scaffolds (beat-sheet, circle, email, play).")
-    p_gen.add_argument("template", choices=["beat-sheet", "story-circle", "pas", "bab", "hso", "unity-play"],
+    # 8. Generate — Scaffold generators
+    p_gen = sub.add_parser("generate", help="Generate elite framework scaffolds (beat-sheet, circle, email, play, video, reel, youtube).")
+    p_gen.add_argument("template", choices=["beat-sheet", "story-circle", "pas", "bab", "hso", "unity-play", "talking-head", "reel", "youtube"],
                        help="Template to generate")
     p_gen.add_argument("--title", default="Untitled", help="Project title")
     p_gen.add_argument("--protagonist", default="HERO", help="Protagonist name (for story-circle)")
-    p_gen.add_argument("--topic", default="your challenge", help="Topic (for email templates)")
+    p_gen.add_argument("--topic", default="your challenge", help="Topic (for email or video templates)")
     p_gen.add_argument("--location", default="A cramped apartment kitchen", help="Location (for unity-play)")
     p_gen.add_argument("--json", action="store_true", help="Output as JSON")
 
@@ -222,6 +225,10 @@ def main(argv: list[str] | None = None) -> int:
             poly_obj = UniversalScriptEngine.parse_comic_script(content, title=args.title)
         elif t == "email":
             poly_obj = UniversalScriptEngine.parse_email_script(content, title=args.title)
+        elif t in {"video", "reel", "youtube"}:
+            from nougenscript.dialects import ScriptKind
+            k = ScriptKind.SHORT_FORM_REEL if t == "reel" else (ScriptKind.LONG_FORM_YOUTUBE if t == "youtube" else ScriptKind.TALKING_HEAD_VIDEO)
+            poly_obj = UniversalScriptEngine.parse_creator_video(content, title=args.title, kind=k)
         elif t in {"code", "typescript", "javascript", "python"}:
             effective_lang = "typescript" if t == "typescript" else ("javascript" if t == "javascript" else ("python" if t == "python" else args.lang))
             poly_obj = UniversalScriptEngine.parse_code_script(content, language=effective_lang, entrypoint=args.file.stem)
@@ -248,13 +255,19 @@ def main(argv: list[str] | None = None) -> int:
             elif poly_obj.meta.kind.value == "cold_email":
                 em = poly_obj.body
                 print(f"  ✉️ Email Subject: \"{em.subject_line}\" (CTA: {em.call_to_action_text} -> {em.call_to_action_url})")
+            elif "video" in poly_obj.meta.domain.value.lower() or "reel" in poly_obj.meta.kind.value:
+                vid = poly_obj.body
+                print(f"  🎥 Hook (3s): \"{vid.hook_3s}\"")
+                print(f"  ⏱️ Estimated Duration: ~{vid.estimated_duration_sec}s ({len(vid.beats)} beats)")
+                if vid.call_to_action:
+                    print(f"  🎯 CTA: {vid.call_to_action}")
             elif "code" in poly_obj.meta.domain.value.lower():
                 code_spec = poly_obj.body
                 print(f"  💻 Code Language: {code_spec.language.upper()} (Deps: {code_spec.dependencies}, Exports: {code_spec.exports})")
         return 0
 
     # ------------------------------------------------------------------- #
-    # v0.4.0 — Validate
+    # Validate — Elite quality gates
     # ------------------------------------------------------------------- #
     if args.command == "validate":
         content = args.file.read_text(encoding="utf-8")
@@ -277,6 +290,10 @@ def main(argv: list[str] | None = None) -> int:
             poly_obj = UniversalScriptEngine.parse_comic_script(content, title=args.title)
         elif t == "email":
             poly_obj = UniversalScriptEngine.parse_email_script(content, title=args.title)
+        elif t in {"video", "reel", "youtube"}:
+            from nougenscript.dialects import ScriptKind
+            k = ScriptKind.SHORT_FORM_REEL if t == "reel" else (ScriptKind.LONG_FORM_YOUTUBE if t == "youtube" else ScriptKind.TALKING_HEAD_VIDEO)
+            poly_obj = UniversalScriptEngine.parse_creator_video(content, title=args.title, kind=k)
         else:
             effective_lang = t if t in {"typescript", "javascript", "python"} else "python"
             poly_obj = UniversalScriptEngine.parse_code_script(content, language=effective_lang, entrypoint=args.file.stem)
@@ -360,6 +377,27 @@ def main(argv: list[str] | None = None) -> int:
                 for act in outline.act_structure:
                     print(f"\n  {act['act']}")
                     print(f"    {act['description']}")
+
+        elif tmpl in {"talking-head", "reel", "youtube"}:
+            if tmpl == "talking-head":
+                v_out = generate_talking_head_template(topic=args.topic)
+            elif tmpl == "reel":
+                v_out = generate_short_form_reel_template(topic=args.topic)
+            else:
+                v_out = generate_youtube_longform_template(topic=args.topic)
+
+            if args.json:
+                from dataclasses import asdict
+                print(json.dumps(asdict(v_out), indent=2))
+            else:
+                print(f"🎥 {v_out.format_name} — Target: {v_out.target_duration}")
+                print(f"  ⚡ Hook Directive: {v_out.hook_directive}")
+                print("\n  Structure Beats:")
+                for b in v_out.structure_beats:
+                    print(f"    • [{b['phase']}] {b['direction']}")
+                print("\n  Retention Invariants:")
+                for g in v_out.retention_guidelines:
+                    print(f"    ↳ {g}")
 
         return 0
 

@@ -22,10 +22,12 @@ from nougenscript.core import Dialogue, Scene, Screenplay
 from nougenscript.dialects import (
     ComicPage,
     ComicPanel,
+    CreatorVideoScript,
     EmailSection,
     PolyScript,
     ScriptKind,
     TVAct,
+    VideoScriptBeat,
 )
 
 
@@ -713,6 +715,123 @@ class DeterministicDiffGate:
 
 
 # ======================================================================== #
+# 8. Video Retention Validator (from Visions-Ai Story Rules / Philipp Humm)
+# ======================================================================== #
+
+class VideoRetentionValidator:
+    """Validates creator video scripts against retention rules.
+
+    Enforces:
+    - 3-second hook pattern interrupt
+    - Clear stakes / context in setup
+    - Sensory detail and concrete language
+    - Sound design cues / music swells
+    - Micro-beat velocity (visual/audio change every 2-5s)
+    - Call to action with clear payoff
+    """
+
+    ABSTRACT_WORDS = re.compile(
+        r"\b(synergy|paradigm|optimization|leverage|utilize|facilitate|various|aspects|multifaceted)\b",
+        re.IGNORECASE
+    )
+    SENSORY_WORDS = re.compile(
+        r"\b(red|black|cold|burning|crashing|loud|whisper|staring|sweat|screaming|freezing|glowing|shaking|shattered)\b",
+        re.IGNORECASE
+    )
+
+    @classmethod
+    def validate_video(cls, script: CreatorVideoScript) -> ValidationReport:
+        issues: list[ValidationIssue] = []
+
+        # 1. 3-Second Hook Check
+        if not script.hook_3s or len(script.hook_3s.split()) < 3:
+            issues.append(ValidationIssue(
+                severity="error",
+                code="MISSING_HOOK",
+                message="Video lacks an aggressive 3-second hook or pattern interrupt",
+                suggestion="Open with an unexpected question, visual jolt, or contrary statement in the first 3 seconds."
+            ))
+        elif len(script.hook_3s.split()) > 25:
+            issues.append(ValidationIssue(
+                severity="warning",
+                code="OVERLONG_HOOK",
+                message=f"Hook is {len(script.hook_3s.split())} words — too long for a 3-second pattern interrupt",
+                suggestion="Compress hook to under 15 punchy words."
+            ))
+
+        # 2. Stakes Check
+        if not script.setup or len(script.setup.strip()) < 10:
+            issues.append(ValidationIssue(
+                severity="warning",
+                code="WEAK_STAKES",
+                message="No clear stakes or setup context provided",
+                suggestion="State what happens if the viewer doesn't listen or the struggle being solved."
+            ))
+
+        # 3. Micro-Beat Velocity & Pattern Interrupts
+        pattern_interrupt_count = sum(1 for b in script.beats if b.is_pattern_interrupt)
+        sound_cue_count = sum(1 for b in script.beats if b.sound_design)
+
+        if script.beats and len(script.beats) < 3:
+            issues.append(ValidationIssue(
+                severity="warning",
+                code="LOW_BEAT_DENSITY",
+                message=f"Only {len(script.beats)} visual/audio beats defined",
+                suggestion="Break script into distinct micro-beats changing state every 3-5 seconds."
+            ))
+
+        if pattern_interrupt_count == 0 and len(script.beats) > 4:
+            issues.append(ValidationIssue(
+                severity="info",
+                code="NO_PATTERN_INTERRUPTS",
+                message="No explicit pattern interrupts marked in script",
+                suggestion="Add at least one visual/audio reset (sound hit, zoom in/out, angle change) to arrest scroll."
+            ))
+
+        # 4. Sensory detail check across spoken audio
+        all_spoken = " ".join(b.spoken_audio for b in script.beats) + " " + script.hook_3s
+        abstract_hits = cls.ABSTRACT_WORDS.findall(all_spoken)
+        sensory_hits = cls.SENSORY_WORDS.findall(all_spoken)
+
+        if abstract_hits:
+            issues.append(ValidationIssue(
+                severity="info",
+                code="ABSTRACT_JARGON",
+                message=f"Abstract jargon detected ({len(abstract_hits)} instance(s)): {', '.join(set(abstract_hits)[:3])}",
+                suggestion="Replace abstract corporate language with raw, tangible, conversational nouns and verbs."
+            ))
+
+        # 5. Call to action check
+        if not script.call_to_action:
+            issues.append(ValidationIssue(
+                severity="warning",
+                code="MISSING_CTA",
+                message="No call to action defined at conclusion of video",
+                suggestion="Provide one single clear next step or loop back to the hook."
+            ))
+
+        score = 1.0
+        if any(i.severity == "error" for i in issues):
+            score -= 0.3
+        if any(i.severity == "warning" for i in issues):
+            score -= 0.1 * len([i for i in issues if i.severity == "warning"])
+
+        return ValidationReport(
+            validator_name="VideoRetention (Visions-Ai Story Rules)",
+            passed=all(i.severity != "error" for i in issues),
+            issues=issues,
+            score=max(score, 0.0),
+            metadata={
+                "hook_word_count": len(script.hook_3s.split()),
+                "beat_count": len(script.beats),
+                "pattern_interrupts": pattern_interrupt_count,
+                "sound_cues": sound_cue_count,
+                "sensory_words_count": len(sensory_hits),
+            }
+        )
+
+
+# ======================================================================== #
 # Unified Validation Pipeline
 # ======================================================================== #
 
@@ -754,6 +873,10 @@ class ScriptValidator:
         elif kind in {ScriptKind.COLD_EMAIL, ScriptKind.DRIP_SEQUENCE, ScriptKind.NEWSLETTER}:
             if isinstance(poly.body, EmailSection):
                 reports.append(SchwartzAwarenessValidator.validate_email(poly.body))
+
+        elif kind in {ScriptKind.TALKING_HEAD_VIDEO, ScriptKind.SHORT_FORM_REEL, ScriptKind.LONG_FORM_YOUTUBE}:
+            if isinstance(poly.body, CreatorVideoScript):
+                reports.append(VideoRetentionValidator.validate_video(poly.body))
 
         return reports
 

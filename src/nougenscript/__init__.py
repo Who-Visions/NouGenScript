@@ -13,12 +13,14 @@ from nougenscript.dialects import (
     CodeScriptSpec,
     ComicPage,
     ComicPanel,
+    CreatorVideoScript,
     EmailSection,
     PolyScript,
     ScriptDomain,
     ScriptKind,
     ScriptMeta,
     TVAct,
+    VideoScriptBeat,
 )
 from nougenscript.dual_plane import DisplaySpan, DualPlaneProjector, SpokenToken
 from nougenscript.engine import UniversalScriptEngine
@@ -64,12 +66,16 @@ from nougenscript.templates import (
     EmailTemplate,
     TransitionAnnotation,
     UnityOutline,
+    VideoTemplateOutput,
     generate_bab_template,
     generate_beat_sheet,
     generate_hso_template,
     generate_pas_template,
+    generate_short_form_reel_template,
     generate_story_circle,
+    generate_talking_head_template,
     generate_unity_outline,
+    generate_youtube_longform_template,
 )
 from nougenscript.validators import (
     AristotleUnitiesValidator,
@@ -87,9 +93,10 @@ from nougenscript.validators import (
     ScriptValidator,
     ValidationIssue,
     ValidationReport,
+    VideoRetentionValidator,
 )
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"
 __all__ = [
     # Core AST
     "Audience",
@@ -103,6 +110,7 @@ __all__ = [
     "CodeScriptSpec",
     "ComicPage",
     "ComicPanel",
+    "CreatorVideoScript",
     "Cue",
     "Dialogue",
     "Direction",
@@ -142,12 +150,13 @@ __all__ = [
     "SubtextAnalyzer",
     "TVAct",
     "UniversalScriptEngine",
+    "VideoScriptBeat",
     "blend",
     "get_emotion",
     "get_mask",
     "list_masks",
     "resolve",
-    # v0.4.0 — Validators
+    # Validators
     "AristotleUnitiesValidator",
     "AwarenessStage",
     "BeatSheetValidator",
@@ -163,16 +172,21 @@ __all__ = [
     "ScriptValidator",
     "ValidationIssue",
     "ValidationReport",
-    # v0.4.0 — Templates
+    "VideoRetentionValidator",
+    # Templates & Scaffolds
     "BeatEntry",
     "CircleStep",
     "EmailTemplate",
     "TransitionAnnotation",
     "UnityOutline",
+    "VideoTemplateOutput",
     "generate_bab_template",
     "generate_beat_sheet",
     "generate_hso_template",
     "generate_pas_template",
+    "generate_short_form_reel_template",
     "generate_story_circle",
+    "generate_talking_head_template",
     "generate_unity_outline",
+    "generate_youtube_longform_template",
 ]

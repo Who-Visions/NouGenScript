@@ -19,12 +19,14 @@ from nougenscript.dialects import (
     CodeScriptSpec,
     ComicPage,
     ComicPanel,
+    CreatorVideoScript,
     EmailSection,
     PolyScript,
     ScriptDomain,
     ScriptKind,
     ScriptMeta,
     TVAct,
+    VideoScriptBeat,
 )
 from nougenscript.parser import FountainParser
 
@@ -199,7 +201,97 @@ class UniversalScriptEngine:
         return PolyScript(meta=meta, body=section, raw_source=source_text)
 
     # ----------------------------------------------------------------------- #
-    # 5. Code Scripts (TypeScript, JavaScript, Python, Bash)
+    # 5. Creator Video Scripts (Shorts, Reels, YouTube Long-Form)
+    # ----------------------------------------------------------------------- #
+    @classmethod
+    def parse_creator_video(cls, source_text: str, title: str = "Untitled Video Script", kind: ScriptKind = ScriptKind.TALKING_HEAD_VIDEO) -> PolyScript:
+        """Parses creator video scripts with Hooks, Visual/Audio Beats, and Pattern Interrupts."""
+        lines = source_text.strip().splitlines()
+        hook_3s = ""
+        setup = ""
+        cta = ""
+        thumb = ""
+        beats: list[VideoScriptBeat] = []
+
+        curr_time = "00:00"
+        curr_visual = ""
+        curr_audio = []
+        curr_sound = ""
+        curr_interrupt = False
+
+        for line in lines:
+            line_str = line.strip()
+            if not line_str:
+                continue
+
+            lower = line_str.lower()
+            if lower.startswith("hook:") or lower.startswith("hook (3s):") or lower.startswith("the hook:"):
+                hook_3s = re.sub(r"^(?:hook(?:\s*\(3s\))?|the hook):\s*", "", line_str, flags=re.IGNORECASE).strip()
+            elif lower.startswith("setup:") or lower.startswith("the setup:"):
+                setup = re.sub(r"^(?:setup|the setup):\s*", "", line_str, flags=re.IGNORECASE).strip()
+            elif lower.startswith("cta:") or lower.startswith("call to action:"):
+                cta = re.sub(r"^(?:cta|call to action):\s*", "", line_str, flags=re.IGNORECASE).strip()
+            elif lower.startswith("thumbnail:") or lower.startswith("thumbnail concept:"):
+                thumb = re.sub(r"^(?:thumbnail(?:\s*concept)?):\s*", "", line_str, flags=re.IGNORECASE).strip()
+            elif line_str.startswith("[") and "]" in line_str:
+                # Any bracketed header [00:05] or [PATTERN INTERRUPT] or [00:20 - PATTERN INTERRUPT] creates a beat boundary
+                tag = line_str[1:line_str.find("]")].strip()
+                if curr_visual or curr_audio:
+                    beats.append(VideoScriptBeat(
+                        timecode_start=curr_time,
+                        visual_action=curr_visual,
+                        spoken_audio=" ".join(curr_audio),
+                        sound_design=curr_sound,
+                        is_pattern_interrupt=curr_interrupt
+                    ))
+                    curr_visual = ""
+                    curr_audio = []
+                    curr_sound = ""
+                    curr_interrupt = False
+
+                curr_time = tag
+                if "pattern interrupt" in tag.lower():
+                    curr_interrupt = True
+            elif lower.startswith("visual:") or lower.startswith("camera:") or lower.startswith("b-roll:"):
+                curr_visual = re.sub(r"^(?:visual|camera|b-roll):\s*", "", line_str, flags=re.IGNORECASE).strip()
+            elif lower.startswith("sfx:") or lower.startswith("sound:"):
+                curr_sound = re.sub(r"^(?:sfx|sound):\s*", "", line_str, flags=re.IGNORECASE).strip()
+            elif lower.startswith("audio:") or lower.startswith("spoken:") or lower.startswith("speech:"):
+                curr_audio.append(re.sub(r"^(?:audio|spoken|speech):\s*", "", line_str, flags=re.IGNORECASE).strip())
+            else:
+                # Default text line is treated as spoken audio
+                curr_audio.append(line_str)
+
+        if curr_visual or curr_audio:
+            beats.append(VideoScriptBeat(
+                timecode_start=curr_time,
+                visual_action=curr_visual,
+                spoken_audio=" ".join(curr_audio),
+                sound_design=curr_sound,
+                is_pattern_interrupt=curr_interrupt
+            ))
+
+        est_sec = max(len(beats) * 3, 30) if beats else 60
+        script_obj = CreatorVideoScript(
+            hook_3s=hook_3s or (beats[0].spoken_audio[:60] if beats else "Pattern Interrupt Hook"),
+            setup=setup or "Context & Stakes established.",
+            beats=beats,
+            call_to_action=cta,
+            thumbnail_concept=thumb,
+            title_concept=title,
+            estimated_duration_sec=est_sec
+        )
+
+        meta = ScriptMeta(
+            title=title,
+            kind=kind,
+            domain=ScriptDomain.CREATOR_VIDEO,
+            target_medium="video"
+        )
+        return PolyScript(meta=meta, body=script_obj, raw_source=source_text)
+
+    # ----------------------------------------------------------------------- #
+    # 6. Code Scripts (TypeScript, JavaScript, Python, Bash)
     # ----------------------------------------------------------------------- #
     @classmethod
     def parse_code_script(cls, source_code: str, language: str, entrypoint: str = "main") -> PolyScript:

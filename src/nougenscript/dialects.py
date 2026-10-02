@@ -29,6 +29,7 @@ class ScriptDomain(str, enum.Enum):
     THEATRE = "THEATRE"                        # Stage plays, playwriting, proscenium staging
     COMIC_BOOK = "COMIC_BOOK"                  # Comic books, manga, graphic novels (pages/panels/SFX)
     EMAIL_CAMPAIGN = "EMAIL_CAMPAIGN"          # Cold emails, lifecycle sequences, nurture tracks
+    CREATOR_VIDEO = "CREATOR_VIDEO"            # YouTube essays, vertical reels, talking head
     CODE_TYPESCRIPT = "CODE_TYPESCRIPT"        # TypeScript (.ts, .tsx)
     CODE_JAVASCRIPT = "CODE_JAVASCRIPT"        # JavaScript (.js, .mjs, .jsx)
     CODE_PYTHON = "CODE_PYTHON"                # Python (.py)
@@ -43,6 +44,11 @@ class ScriptKind(str, enum.Enum):
     TV_EPISODIC = "tv_episodic"
     STAGE_PLAY = "stage_play"
     COMIC_SCRIPT = "comic_script"
+
+    # Creator & Digital Video Formats (from Visions-Ai Story Rules)
+    TALKING_HEAD_VIDEO = "talking_head_video"
+    SHORT_FORM_REEL = "short_form_reel"
+    LONG_FORM_YOUTUBE = "long_form_youtube"
 
     # Business / Copy
     COLD_EMAIL = "cold_email"
@@ -111,6 +117,38 @@ class EmailSection:
     call_to_action_text: str
     ps_line: str = ""
     sign_off: str = field(default_factory=lambda: os.getenv("NOUGEN_SIGN_OFF", "Best Regards"))
+
+
+# --------------------------------------------------------------------------- #
+# Creator & Video Script Structures (from Visions-Ai Story Rules)
+# --------------------------------------------------------------------------- #
+
+@dataclass
+class VideoScriptBeat:
+    """A granular visual/spoken beat in a creator video script."""
+    timecode_start: str = "00:00"
+    visual_action: str = ""        # Camera angle, B-roll description, graphic overlay
+    spoken_audio: str = ""         # Spoken monologue / dialogue
+    sound_design: str = ""         # Sound effects, risers, whooshes, score swell
+    is_pattern_interrupt: bool = False
+    beat_id: str = ""
+
+    def __post_init__(self):
+        if not self.beat_id:
+            h = hashlib.sha256(f"{self.timecode_start}:{self.visual_action}:{self.spoken_audio}".encode()).hexdigest()[:10]
+            self.beat_id = h
+
+
+@dataclass
+class CreatorVideoScript:
+    """Full creator script: Talking Head, YouTube Video Essay, or Vertical Short."""
+    hook_3s: str                   # First 3 seconds pattern interrupt
+    setup: str                     # Context / Stakes
+    beats: list[VideoScriptBeat] = field(default_factory=list)
+    call_to_action: str = ""
+    thumbnail_concept: str = ""
+    title_concept: str = ""
+    estimated_duration_sec: int = 60
 
 
 @dataclass

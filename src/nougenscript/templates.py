@@ -280,3 +280,84 @@ def generate_unity_outline(title: str = "Untitled Play",
                             "are permanently altered. The final silence speaks the verdict."},
         ],
     )
+
+
+# ======================================================================== #
+# 6. Creator Video Templates (from Visions-Ai Story Rules)
+# ======================================================================== #
+
+@dataclass
+class VideoTemplateOutput:
+    format_name: str
+    target_duration: str
+    hook_directive: str
+    structure_beats: list[dict[str, str]]
+    retention_guidelines: list[str]
+
+
+def generate_talking_head_template(topic: str = "your core thesis",
+                                   core_lesson: str = "the fundamental truth") -> VideoTemplateOutput:
+    """Scaffold for Talking Head Retention Storytelling (Philipp Humm masterclass)."""
+    return VideoTemplateOutput(
+        format_name="Talking Head Storytelling",
+        target_duration="60s - 90s",
+        hook_directive=f"Pattern interrupt within first 3 seconds: 'Most people think {topic} is about X. They are completely wrong.'",
+        structure_beats=[
+            {"phase": "1. THE HOOK (0-3s)", "direction": f"Pattern interrupt / counter-intuitive thesis on {topic}."},
+            {"phase": "2. THE SETUP (3-15s)", "direction": "Who, What, Where. Ground the audience with sensory specifics, not abstract summary."},
+            {"phase": "3. INCITING MOMENT (15-30s)", "direction": "Suddenly... the unexpected collision or realization occurs."},
+            {"phase": "4. THE STRUGGLE (30-60s)", "direction": f"No struggle, no story. Show the exact friction and resistance before {core_lesson}."},
+            {"phase": "5. CLIMAX & LESSON (60-80s)", "direction": f"The emotional breakthrough: {core_lesson}."},
+            {"phase": "6. THE RESOLUTION & CTA (80-90s)", "direction": "The new normal + immediate, low-friction next step."},
+        ],
+        retention_guidelines=[
+            "Eye contact: Look down the barrel of the lens, not the display monitor.",
+            "Energy dial: Project +20% higher conversational arousal than normal.",
+            "Sensory anchoring: State concrete objects and raw feelings over abstract business jargon.",
+            "Pre-emphasis pause: Silence before the critical insight amplifies weight."
+        ]
+    )
+
+
+def generate_short_form_reel_template(topic: str = "high-velocity concept") -> VideoTemplateOutput:
+    """Scaffold for High-Velocity 9:16 Vertical Short / Reel."""
+    return VideoTemplateOutput(
+        format_name="Vertical Reel / Short (9:16)",
+        target_duration="30s - 45s",
+        hook_directive="Kinetic visual or typography jolt under 0.5s.",
+        structure_beats=[
+            {"phase": "1. KINETIC HOOK (0-2s)", "direction": f"High motion text + voiceover punchline: '{topic}'."},
+            {"phase": "2. MICRO-BEAT 1 (2-8s)", "direction": "First angle switch / dynamic B-roll cut illustrating the friction."},
+            {"phase": "3. PATTERN INTERRUPT (8-14s)", "direction": "Sound effect drop / screen shake / bold color pop."},
+            {"phase": "4. ACCELERATION (14-25s)", "direction": "Fast-paced proof / 3 quick consecutive examples."},
+            {"phase": "5. SEAMLESS LOOP CLOSURE (25-30s)", "direction": "End phrase loops grammatically back into the first opening word."},
+        ],
+        retention_guidelines=[
+            "Pacing: State change every 2 to 3 seconds minimum.",
+            "B-Roll lock: Visual footage must strictly mirror the spoken phonetic noun.",
+            "Loop design: Seamless zero-friction loop back to the hook."
+        ]
+    )
+
+
+def generate_youtube_longform_template(topic: str = "deep investigation",
+                                       promise: str = "the hidden architecture revealed") -> VideoTemplateOutput:
+    """Scaffold for YouTube Main Long-Form Video Essay."""
+    return VideoTemplateOutput(
+        format_name="YouTube Long-Form Video Essay",
+        target_duration="8m - 15m",
+        hook_directive=f"Deliver the Thumbnail/Title promise payoff up front: {promise}",
+        structure_beats=[
+            {"phase": "1. PROMISE & STAKES (0-45s)", "direction": f"Hook the payoff: {promise}. Establish what viewer loses by ignoring."},
+            {"phase": "2. THE STATUS QUO (45s-2m)", "direction": f"Why the conventional approach to {topic} fails."},
+            {"phase": "3. THE DEEP DIVE (2m-5m)", "direction": "Deconstruct the core evidence, data points, or narrative scene."},
+            {"phase": "4. MIDPOINT REVERSAL (5m-7m)", "direction": "The unexpected twist: What everyone assumed is inverted."},
+            {"phase": "5. THE SYNTHESIS (7m-11m)", "direction": "Building the new framework / applying the breakthrough."},
+            {"phase": "6. THE FINAL CONVICTION & PAYOFF (11m-13m)", "direction": "Redeem the original promise in full color."},
+        ],
+        retention_guidelines=[
+            "Scoring: Music swells guide emotional transitions, never flat background elevator music.",
+            "Nano Banana rule: Plant weird, highly specific, memorable details that prove human authorship.",
+            "Visual variety: Shift focal lengths, angles, or scenes every 15-20 seconds."
+        ]
+    )

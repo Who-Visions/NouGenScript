@@ -41,6 +41,7 @@ from nougenscript.validators import (
     ScriptValidator,
     ValidationIssue,
     ValidationReport,
+    VideoRetentionValidator,
 )
 from nougenscript.templates import (
     BeatEntry,
@@ -48,12 +49,16 @@ from nougenscript.templates import (
     EmailTemplate,
     TransitionAnnotation,
     UnityOutline,
+    VideoTemplateOutput,
     generate_bab_template,
     generate_beat_sheet,
     generate_hso_template,
     generate_pas_template,
+    generate_short_form_reel_template,
     generate_story_circle,
+    generate_talking_head_template,
     generate_unity_outline,
+    generate_youtube_longform_template,
 )
 
 
@@ -407,9 +412,57 @@ class TestTemplateGenerators:
             else:
                 os.environ.pop("NOUGEN_SIGN_OFF", None)
 
+    def test_talking_head_template(self):
+        tmpl = generate_talking_head_template(topic="token limits", core_lesson="swarm decentralization")
+        assert isinstance(tmpl, VideoTemplateOutput)
+        assert len(tmpl.structure_beats) == 6
+        assert "token limits" in tmpl.hook_directive
+        assert any("Eye contact" in g for g in tmpl.retention_guidelines)
+
+    def test_short_form_reel_template(self):
+        tmpl = generate_short_form_reel_template(topic="memory clustering")
+        assert tmpl.target_duration == "30s - 45s"
+        assert len(tmpl.structure_beats) == 5
+        assert any("Loop design" in g for g in tmpl.retention_guidelines)
+
+    def test_youtube_longform_template(self):
+        tmpl = generate_youtube_longform_template(topic="The Observatory", promise="108k shards live")
+        assert "8m - 15m" in tmpl.target_duration
+        assert any("Nano Banana" in g for g in tmpl.retention_guidelines)
+
 
 # ======================================================================== #
-# 10. ValidationReport internals
+# 10. VideoRetentionValidator Tests
+# ======================================================================== #
+
+class TestVideoRetentionValidator:
+    def test_video_retention_passes(self):
+        from nougenscript.dialects import CreatorVideoScript, VideoScriptBeat
+        script = CreatorVideoScript(
+            hook_3s="Stop using single LLMs for complex coding.",
+            setup="In 2026, context overflow ruins stateful development across sessions.",
+            beats=[
+                VideoScriptBeat(timecode_start="00:00", visual_action="Camera cut", spoken_audio="Here is what you must do.", sound_design="bass drop", is_pattern_interrupt=True),
+                VideoScriptBeat(timecode_start="00:05", visual_action="Screen recording", spoken_audio="Look at this red glowing cluster.", sound_design="click"),
+                VideoScriptBeat(timecode_start="00:15", visual_action="Diagram", spoken_audio="We distribute shards across 9 SQLite banks.", sound_design="whoosh"),
+            ],
+            call_to_action="Star the repository on GitHub.",
+            estimated_duration_sec=30
+        )
+        report = VideoRetentionValidator.validate_video(script)
+        assert report.passed is True
+        assert report.metadata["pattern_interrupts"] >= 1
+
+    def test_missing_hook_fails(self):
+        from nougenscript.dialects import CreatorVideoScript
+        script = CreatorVideoScript(hook_3s="", setup="Some setup context here.")
+        report = VideoRetentionValidator.validate_video(script)
+        assert report.passed is False
+        assert any(i.code == "MISSING_HOOK" for i in report.issues)
+
+
+# ======================================================================== #
+# 11. ValidationReport internals
 # ======================================================================== #
 
 class TestValidationReport:

@@ -182,3 +182,45 @@ def test_dynamic_deterministic_overrides(monkeypatch):
     sig = Signals.from_texts(["some text"])
     assert sig.tz == "America/Chicago"
 
+
+def test_creator_video_parsing():
+    source = """
+HOOK (3s): Stop building monolithic agents that choke on context windows.
+THE SETUP: In 2026, multi-agent swarms replaced single LLM chains.
+
+[00:00 - TALKING HEAD]
+CAMERA: Tight close-up down the barrel.
+AUDIO: You're spending $50 a day on tokens for zero retainable memory.
+SFX: Bass drop / heartbeat swell
+
+[00:08 - B-ROLL]
+CAMERA: Screen recording of 129k shard cluster sync.
+AUDIO: Here is the exact 12-lane architecture that runs at zero cost.
+SFX: Keyboard clatter
+
+[00:20 - PATTERN INTERRUPT]
+CAMERA: Glitch cut to monochrome.
+AUDIO: But wait until you see the circuit breaker topology.
+SFX: Static burst
+
+CTA: Clone the repo at Who-Visions/NouGenScript to run it locally.
+THUMBNAIL: Red laser reticle locking onto glowing shard bank.
+"""
+    video_poly = UniversalScriptEngine.parse_creator_video(source, title="Zero Cost Swarm", kind=ScriptKind.TALKING_HEAD_VIDEO)
+    assert video_poly.meta.domain == ScriptDomain.CREATOR_VIDEO
+    assert video_poly.meta.kind == ScriptKind.TALKING_HEAD_VIDEO
+    vid = video_poly.body
+    assert "Stop building monolithic agents" in vid.hook_3s
+    assert len(vid.beats) == 3
+    assert any(b.is_pattern_interrupt for b in vid.beats)
+    assert "Who-Visions/NouGenScript" in vid.call_to_action
+    assert video_poly.script_hash != ""
+
+    from nougenscript.validators import ScriptValidator
+    reports = ScriptValidator.validate(video_poly)
+    assert any(r.validator_name == "VideoRetention (Visions-Ai Story Rules)" for r in reports)
+    vid_report = next(r for r in reports if r.validator_name == "VideoRetention (Visions-Ai Story Rules)")
+    assert vid_report.passed is True
+    assert vid_report.metadata["pattern_interrupts"] >= 1
+
+
