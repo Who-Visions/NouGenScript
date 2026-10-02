@@ -36,9 +36,11 @@ from nougenscript.validators import (
     HarmonCircleValidator,
     HarmonStep,
     McCloudTransitionValidator,
+    MythicNoirValidator,
     PanelTransition,
     SchwartzAwarenessValidator,
     ScriptValidator,
+    ThirtyActValidator,
     ValidationIssue,
     ValidationReport,
     VideoRetentionValidator,
@@ -47,6 +49,7 @@ from nougenscript.templates import (
     BeatEntry,
     CircleStep,
     EmailTemplate,
+    ThirtyActEntry,
     TransitionAnnotation,
     UnityOutline,
     VideoTemplateOutput,
@@ -57,6 +60,7 @@ from nougenscript.templates import (
     generate_short_form_reel_template,
     generate_story_circle,
     generate_talking_head_template,
+    generate_thirty_act_scaffold,
     generate_unity_outline,
     generate_youtube_longform_template,
 )
@@ -462,7 +466,66 @@ class TestVideoRetentionValidator:
 
 
 # ======================================================================== #
-# 11. ValidationReport internals
+# 11. ThirtyAct & MythicNoir Validator Tests (Rhea-Noir assimilation)
+# ======================================================================== #
+
+class TestThirtyActValidator:
+    def test_generate_thirty_acts_completeness(self):
+        acts = generate_thirty_act_scaffold(title="Shadow Dweller: Origin", protagonist="Corbin", shadow="Xoah")
+        assert len(acts) == 30
+        assert acts[0].act_number == 1
+        assert acts[0].phase == "META_OPENER"
+        assert acts[10].act_number == 11
+        assert acts[10].phase == "META_BRIDGE"
+        assert acts[29].act_number == 30
+        assert acts[29].phase == "META_CLOSER"
+
+    def test_thirty_act_validator_passes(self):
+        scenes = [
+            Scene(heading=f"EXT. SECTOR {i} - DAY", nodes=[Dialogue(character="CORBIN", text="We move forward.")])
+            for i in range(1, 31)
+        ]
+        # Insert bridge at 15
+        scenes[14] = Scene(heading="INT. CITADEL - TIME JUMP 5 YEARS LATER", nodes=[Dialogue(character="CORBIN", text="The world has hardened.")])
+        sp = Screenplay("Shadow Dweller Epic", scenes=scenes)
+        report = ThirtyActValidator.validate_screenplay(sp)
+        assert report.passed is True
+        assert report.metadata["total_scenes"] == 30
+        assert report.metadata["intermission_found"] is True
+
+
+class TestMythicNoirValidator:
+    def test_banned_cliche_detected(self):
+        sc = Scene(heading="INT. CORRIDOR - NIGHT", nodes=[
+            Dialogue(character="CORBIN", text="Well that just happened. What now?")
+        ])
+        sp = Screenplay("Cliche Test", scenes=[sc])
+        report = MythicNoirValidator.validate_screenplay(sp)
+        assert report.passed is False
+        assert any(i.code == "BANNED_CLICHE" for i in report.issues)
+
+    def test_canon_category_error_detected(self):
+        sc = Scene(heading="INT. RESEARCH LAB - NIGHT", nodes=[
+            Dialogue(character="ALINA", text="He stepped into the Veil dimension without a suit.")
+        ])
+        sp = Screenplay("Category Test", scenes=[sc])
+        report = MythicNoirValidator.validate_screenplay(sp)
+        assert report.passed is False
+        assert any(i.code == "CANON_CATEGORY_ERROR" for i in report.issues)
+
+    def test_clean_mythic_noir_passes(self):
+        sc = Scene(heading="INT. ARCHIVE - NIGHT", nodes=[
+            Dialogue(character="CORBIN", text="The resonance burns through my synapse. Blood pools at the collar."),
+            Dialogue(character="XOAH", text="Then endure it. Nothing is given without cost.")
+        ])
+        sp = Screenplay("Clean Noir", scenes=[sc])
+        report = MythicNoirValidator.validate_screenplay(sp)
+        assert report.passed is True
+        assert report.score == 1.0
+
+
+# ======================================================================== #
+# 12. ValidationReport internals
 # ======================================================================== #
 
 class TestValidationReport:

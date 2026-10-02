@@ -832,6 +832,173 @@ class VideoRetentionValidator:
 
 
 # ======================================================================== #
+# 9. Thirty-Act Structure Validator ("The Dav3 Standard" from Rhea-Noir)
+# ======================================================================== #
+
+class ThirtyActValidator:
+    """Validates screenplay / long-form epics against the Dav3 Standard 30-Act blueprint.
+
+    Checks:
+    - Target: 25-35 scenes/beats spanning 3 overarching acts + meta-opener/closer + meta-bridge.
+    - Presence of Middle Intervention (Intermission / Reversal) around the ~40-50% mark.
+    - True sacrifice or rock bottom in Act II initiation.
+    - Meta-closer / final thematic seal.
+    """
+
+    @classmethod
+    def validate_screenplay(cls, sp: Screenplay) -> ValidationReport:
+        issues: list[ValidationIssue] = []
+        scene_count = len(sp.scenes)
+
+        if scene_count < 20:
+            issues.append(ValidationIssue(
+                severity="warning",
+                code="LOW_ACT_DENSITY",
+                message=f"Screenplay has {scene_count} scenes. The 30-Act Standard targets ~25-30 granular beats.",
+                suggestion="Flesh out the 12 Sequences and Hero's Journey beats into distinct scenes."
+            ))
+        elif scene_count > 45:
+            issues.append(ValidationIssue(
+                severity="info",
+                code="HIGH_ACT_DENSITY",
+                message=f"Screenplay has {scene_count} scenes. Ensure sequences are tightly grouped.",
+            ))
+
+        # Check for Intermission / Middle Intervention around the midpoint (scenes 10-16 in a ~30-scene script)
+        mid_idx = scene_count // 2
+        intermission_found = False
+        for sc in sp.scenes[max(0, mid_idx - 3):min(len(sp.scenes), mid_idx + 4)]:
+            h = sc.heading.upper()
+            if any(k in h for k in ["INTERMISSION", "BRIDGE", "TIME JUMP", "YEARS LATER", "MONTHS LATER", "INTERVENTION"]):
+                intermission_found = True
+                break
+
+        if not intermission_found and scene_count >= 20:
+            issues.append(ValidationIssue(
+                severity="info",
+                code="NO_META_BRIDGE",
+                message="No explicit Meta-Bridge or Middle Intervention beat detected near the 50% mark.",
+                suggestion="Insert a thematic breather, time-jump, or radical tonal reset near the midpoint."
+            ))
+
+        score = min(scene_count / 30.0, 1.0)
+        return ValidationReport(
+            validator_name="ThirtyActStructure (Dav3 Standard)",
+            passed=all(i.severity != "error" for i in issues),
+            issues=issues,
+            score=score,
+            metadata={"total_scenes": scene_count, "target_acts": 30, "intermission_found": intermission_found}
+        )
+
+
+# ======================================================================== #
+# 10. Mythic Noir & Anti-Convenience Validator (from Rhea-Noir)
+# ======================================================================== #
+
+class MythicNoirValidator:
+    """Validates screenplay dialogue against Rhea-Noir's Mythic Noir Canon Rules.
+
+    Enforces:
+    1. Banned MCU / Hollywood generic dialogue clichés.
+    2. Anti-Convenience & Power-Cost Law: If extreme power/tech is invoked,
+       a physical or cognitive cost (pain, blood, sacrifice, synapse burnout) must be cited.
+    3. Category errors: (e.g. Describing 'The Veil' as a separate dimension rather than a processing substrate).
+    """
+
+    BANNED_CLICHES = [
+        "well that just happened",
+        "he's right behind me isn't he",
+        "i was born ready",
+        "whatever it takes",
+        "we're not so different, you and i",
+        "in english, please",
+        "did i just say that out loud",
+        "so, that's a thing",
+    ]
+
+    POWER_TECH_TERMS = re.compile(
+        r"\b(resonance|frequency|displacement|rift|shadow|teleport|warp|hyper-drive|nano-surge|dark matter|veil-breach)\b",
+        re.IGNORECASE
+    )
+
+    COST_TERMS = re.compile(
+        r"\b(pain|blood|headache|collapse|cost|price|sacrifice|fatigue|memory|synapse|burnout|blindness|tremor|exhaustion)\b",
+        re.IGNORECASE
+    )
+
+    @classmethod
+    def validate_screenplay(cls, sp: Screenplay) -> ValidationReport:
+        issues: list[ValidationIssue] = []
+        cliche_hits = []
+        power_without_cost_scenes = []
+
+        for sc in sp.scenes:
+            node_texts = []
+            for n in sc.nodes:
+                if hasattr(n, "text"):
+                    node_texts.append(n.text)
+                elif hasattr(n, "content"):
+                    node_texts.append(n.content)
+                else:
+                    node_texts.append(str(n))
+            scene_text = sc.heading + " " + " ".join(node_texts)
+            lower_text = scene_text.lower()
+
+            # 1. Cliché check
+            for c in cls.BANNED_CLICHES:
+                if c in lower_text:
+                    cliche_hits.append((sc.heading, c))
+                    issues.append(ValidationIssue(
+                        severity="error",
+                        code="BANNED_CLICHE",
+                        message=f"Banned Hollywood/MCU cliché detected: \"{c}\"",
+                        location=sc.heading,
+                        suggestion="Rewrite dialogue in Mythic Noir grounded cadence. Avoid meta-snark."
+                    ))
+
+            # 2. Power-cost balance
+            has_power = bool(cls.POWER_TECH_TERMS.search(scene_text))
+            has_cost = bool(cls.COST_TERMS.search(scene_text))
+            if has_power and not has_cost:
+                power_without_cost_scenes.append(sc.heading)
+
+            # 3. Specific category check (Veil is not a dimension)
+            if "veil dimension" in lower_text or "into the veil dimension" in lower_text:
+                issues.append(ValidationIssue(
+                    severity="error",
+                    code="CANON_CATEGORY_ERROR",
+                    message="The Veil is described as a 'dimension'. Canon Lock: The Veil is a computational processing substrate, not a magical realm.",
+                    location=sc.heading,
+                    suggestion="Refer to The Veil as the processing substrate, interstitial layer, or mathematical veil."
+                ))
+
+        if len(power_without_cost_scenes) > 2:
+            issues.append(ValidationIssue(
+                severity="warning",
+                code="CONVENIENCE_POWER_DRIFT",
+                message=f"{len(power_without_cost_scenes)} scenes use high-power mechanics with zero physical/cognitive cost cited.",
+                suggestion="Enforce the Anti-Convenience Law: Magic and deep tech must extract a measurable somatic price."
+            ))
+
+        score = 1.0
+        if any(i.severity == "error" for i in issues):
+            score -= 0.3 * len([i for i in issues if i.severity == "error"])
+        if any(i.severity == "warning" for i in issues):
+            score -= 0.1 * len([i for i in issues if i.severity == "warning"])
+
+        return ValidationReport(
+            validator_name="MythicNoir (Rhea-Noir Canon & Anti-Cliché)",
+            passed=all(i.severity != "error" for i in issues),
+            issues=issues,
+            score=max(score, 0.0),
+            metadata={
+                "cliche_violations": len(cliche_hits),
+                "unbalanced_power_scenes": len(power_without_cost_scenes),
+            }
+        )
+
+
+# ======================================================================== #
 # Unified Validation Pipeline
 # ======================================================================== #
 
@@ -852,6 +1019,8 @@ class ScriptValidator:
             if isinstance(poly.body, Screenplay):
                 reports.append(CausalMomentumValidator.validate_scenes(poly.body.scenes))
                 reports.append(BeatSheetValidator.validate_screenplay(poly.body))
+                reports.append(ThirtyActValidator.validate_screenplay(poly.body))
+                reports.append(MythicNoirValidator.validate_screenplay(poly.body))
 
         elif kind in {ScriptKind.TV_PILOT, ScriptKind.TV_EPISODIC}:
             if isinstance(poly.body, list) and all(isinstance(a, TVAct) for a in poly.body):
@@ -865,6 +1034,7 @@ class ScriptValidator:
             if isinstance(poly.body, Screenplay):
                 reports.append(AristotleUnitiesValidator.validate_play(poly.body))
                 reports.append(CausalMomentumValidator.validate_scenes(poly.body.scenes))
+                reports.append(MythicNoirValidator.validate_screenplay(poly.body))
 
         elif kind == ScriptKind.COMIC_SCRIPT:
             if isinstance(poly.body, list) and all(isinstance(p, ComicPage) for p in poly.body):

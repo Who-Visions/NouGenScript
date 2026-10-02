@@ -64,6 +64,7 @@ from nougenscript.templates import (
     BeatEntry,
     CircleStep,
     EmailTemplate,
+    ThirtyActEntry,
     TransitionAnnotation,
     UnityOutline,
     VideoTemplateOutput,
@@ -74,6 +75,7 @@ from nougenscript.templates import (
     generate_short_form_reel_template,
     generate_story_circle,
     generate_talking_head_template,
+    generate_thirty_act_scaffold,
     generate_unity_outline,
     generate_youtube_longform_template,
 )
@@ -88,15 +90,17 @@ from nougenscript.validators import (
     HarmonCircleValidator,
     HarmonStep,
     McCloudTransitionValidator,
+    MythicNoirValidator,
     PanelTransition,
     SchwartzAwarenessValidator,
     ScriptValidator,
+    ThirtyActValidator,
     ValidationIssue,
     ValidationReport,
     VideoRetentionValidator,
 )
 
-__version__ = "0.5.0"
+__version__ = "0.6.0"
 __all__ = [
     # Core AST
     "Audience",
@@ -167,9 +171,11 @@ __all__ = [
     "HarmonCircleValidator",
     "HarmonStep",
     "McCloudTransitionValidator",
+    "MythicNoirValidator",
     "PanelTransition",
     "SchwartzAwarenessValidator",
     "ScriptValidator",
+    "ThirtyActValidator",
     "ValidationIssue",
     "ValidationReport",
     "VideoRetentionValidator",
@@ -177,6 +183,7 @@ __all__ = [
     "BeatEntry",
     "CircleStep",
     "EmailTemplate",
+    "ThirtyActEntry",
     "TransitionAnnotation",
     "UnityOutline",
     "VideoTemplateOutput",
@@ -187,6 +194,7 @@ __all__ = [
     "generate_short_form_reel_template",
     "generate_story_circle",
     "generate_talking_head_template",
+    "generate_thirty_act_scaffold",
     "generate_unity_outline",
     "generate_youtube_longform_template",
 ]

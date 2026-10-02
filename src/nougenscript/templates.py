@@ -361,3 +361,91 @@ def generate_youtube_longform_template(topic: str = "deep investigation",
             "Visual variety: Shift focal lengths, angles, or scenes every 15-20 seconds."
         ]
     )
+
+
+# ======================================================================== #
+# 7. The 30-Act Structure ("The Dav3 Standard" from Rhea-Noir)
+# ======================================================================== #
+
+@dataclass
+class ThirtyActEntry:
+    act_number: int
+    act_name: str
+    phase: str  # META_OPENER | ACT_I_DEPARTURE | META_BRIDGE | ACT_II_INITIATION | ACT_III_RETURN | META_CLOSER
+    story_beat: str
+    description: str
+    pacing_target: str = "4 min"
+
+
+def generate_thirty_act_scaffold(title: str = "Untitled Epic",
+                                  protagonist: str = "PROTAGONIST",
+                                  shadow: str = "THE SHADOW") -> list[ThirtyActEntry]:
+    """Generates the full 30-Act Dav3 Standard narrative architecture."""
+    return [
+        # THE META-OPENER
+        ThirtyActEntry(1, "The Opening Commencement", "META_OPENER", "Intro Credits & Overture",
+                       f"Sets the sonic and visual thesis of {title}. Establishes visual palette, logo reveal, atmospheric baseline.", "2 min"),
+        # ACT I: THE DEPARTURE (Beats 2-10)
+        ThirtyActEntry(2, "The Status Quo", "ACT_I_DEPARTURE", "Ordinary World",
+                       f"{protagonist} in their unshifted equilibrium. Ground the audience in daily physical constraints.", "4 min"),
+        ThirtyActEntry(3, "The Inciting Incident", "ACT_I_DEPARTURE", "Call to Adventure",
+                       f"The disruption: An external fracture forces {protagonist} to acknowledge that the status quo is broken.", "4 min"),
+        ThirtyActEntry(4, "The Refusal", "ACT_I_DEPARTURE", "Reluctance & Cost Calculation",
+                       f"{protagonist} retreats or hesitates. Stakes of change are terrifying; old identity resists.", "4 min"),
+        ThirtyActEntry(5, "The Mentor", "ACT_I_DEPARTURE", "The Guide & The Artifact",
+                       "Encounter with wisdom, tools, or warning that provides the leverage necessary to cross.", "4 min"),
+        ThirtyActEntry(6, "Crossing the Threshold", "ACT_I_DEPARTURE", "Entering the Underworld",
+                       "Irreversible threshold crossing. Point of no return; familiar rules no longer apply.", "4 min"),
+        ThirtyActEntry(7, "Tests, Allies, and Enemies", "ACT_I_DEPARTURE", "The New Reality",
+                       "First trial in the new arena. Alliances formed; opposing forces reveal their teeth.", "4 min"),
+        ThirtyActEntry(8, "The Approach", "ACT_I_DEPARTURE", "Preparing for the First Challenge",
+                       "Regrouping and strategizing for the false summit. Tension accelerates.", "4 min"),
+        ThirtyActEntry(9, "The Ordeal (False)", "ACT_I_DEPARTURE", "Premature Battle",
+                       "A minor victory or deceptive defeat that tricks the protagonist into thinking the task is known.", "4 min"),
+        ThirtyActEntry(10, "The Reward (Temporary)", "ACT_I_DEPARTURE", "Seizing the False Elixir",
+                       f"{protagonist} claims what they thought they wanted. False sense of security settles in.", "4 min"),
+        # THE META-BRIDGE
+        ThirtyActEntry(11, "The Middle Intervention", "META_BRIDGE", "The Intermission / Time-Jump",
+                       "The structural breath. Thematic divider, time-jump, or radical tonal reset before descent.", "3 min"),
+        # ACT II: THE INITIATION (Beats 12-20)
+        ThirtyActEntry(12, "The Road Back (Twist)", "ACT_I_DEPARTURE", "Complication Strikes",
+                       "The false reward triggers unexpected consequences. The map was wrong.", "4 min"),
+        ThirtyActEntry(13, "The Resurrection (False)", "ACT_II_INITIATION", "The Shadow Re-emerges",
+                       f"{shadow} returns in a deadlier, unexpected form. Old tactics completely fail.", "4 min"),
+        ThirtyActEntry(14, "The Return with Elixir (Failure)", "ACT_II_INITIATION", "The First Goal Crumbles",
+                       "The original plan fails catastrophically. Exterior defenses crumble.", "4 min"),
+        ThirtyActEntry(15, "The Second Inciting Incident", "ACT_II_INITIATION", "Raising the True Stakes",
+                       "A deeper truth is exposed. The conflict escalates from personal survival to existential reckoning.", "4 min"),
+        ThirtyActEntry(16, "The Descent", "ACT_II_INITIATION", "Rock Bottom",
+                       "Total loss of external resources, allies, and certainty. The physical low point.", "4 min"),
+        ThirtyActEntry(17, "The Dark Night of the Soul", "ACT_II_INITIATION", "Psychological Death",
+                       f"{protagonist}'s core ego and self-deception die. Pure internal wrestling in silence.", "4 min"),
+        ThirtyActEntry(18, "The Discovery", "ACT_II_INITIATION", "The True Mechanism Revealed",
+                       "The epiphany: The answer was never external. The hidden rule of the world is understood.", "4 min"),
+        ThirtyActEntry(19, "The Turning Point", "ACT_II_INITIATION", "Decision to Fight on New Terms",
+                       f"{protagonist} accepts the ultimate cost and resolves to stand, stripped of illusions.", "4 min"),
+        ThirtyActEntry(20, "The Plan", "ACT_II_INITIATION", "Marshalling the True Vanguard",
+                       "Assembling what remains for the surgical endgame. Precision over bluster.", "4 min"),
+        # ACT III: THE RETURN (Beats 21-29)
+        ThirtyActEntry(21, "Storming the Castle", "ACT_III_RETURN", "The Final Approach",
+                       "Infiltrating the heart of the adversarial territory. Rhythm and momentum lock into fifth gear.", "4 min"),
+        ThirtyActEntry(22, "The High Tower", "ACT_III_RETURN", "Confronting the Primary Defense",
+                       "Breaching the antagonist's inner sanctum. Facing the strongest external shield.", "4 min"),
+        ThirtyActEntry(23, "The Trap", "ACT_III_RETURN", "The All-Is-Lost Counter-Strike",
+                       "The antagonist anticipates the move. A catastrophic ambush tests ultimate resolve.", "4 min"),
+        ThirtyActEntry(24, "The Sacrifice", "ACT_III_RETURN", "Paying the Irreversible Price",
+                       f"{protagonist} pays the non-negotiable cost. No convenient escapes allowed.", "4 min"),
+        ThirtyActEntry(25, "The True Resurrection", "ACT_III_RETURN", "Rebirth from the Ashes",
+                       "Rising through the sacrifice. The new consciousness activates in full authority.", "4 min"),
+        ThirtyActEntry(26, "The Final Blow", "ACT_III_RETURN", "Defeating the Shadow",
+                       f"The climatic clash: {shadow} is dismantled not through luck, but transformed truth.", "4 min"),
+        ThirtyActEntry(27, "The New Status Quo", "ACT_III_RETURN", "The World Irreversibly Changed",
+                       "The smoke clears. The landscape, laws, and power dynamics are permanently reorganized.", "4 min"),
+        ThirtyActEntry(28, "The Elixir", "ACT_III_RETURN", "The True Gift Delivered",
+                       "The true wisdom or technology is brought back to heal the collective world.", "4 min"),
+        ThirtyActEntry(29, "The Farewell", "ACT_III_RETURN", "Closing the Loops",
+                       "Bittersweet resolution of relationships, debts, and departed comrades.", "4 min"),
+        # THE META-CLOSER
+        ThirtyActEntry(30, "The Grand Finale", "META_CLOSER", "Closing Credits & Post-Credits Seal",
+                       f"Final thematic image. Closing audio motif. The definitive authorial seal on {title}.", "3 min"),
+    ]

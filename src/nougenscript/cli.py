@@ -42,6 +42,7 @@ from nougenscript import (
     generate_talking_head_template,
     generate_short_form_reel_template,
     generate_youtube_longform_template,
+    generate_thirty_act_scaffold,
 )
 
 
@@ -107,11 +108,12 @@ def main(argv: list[str] | None = None) -> int:
     p_val.add_argument("--json", action="store_true", help="Output validation report as JSON")
 
     # 8. Generate — Scaffold generators
-    p_gen = sub.add_parser("generate", help="Generate elite framework scaffolds (beat-sheet, circle, email, play, video, reel, youtube).")
-    p_gen.add_argument("template", choices=["beat-sheet", "story-circle", "pas", "bab", "hso", "unity-play", "talking-head", "reel", "youtube"],
+    p_gen = sub.add_parser("generate", help="Generate elite framework scaffolds (beat-sheet, circle, email, play, video, reel, youtube, thirty-acts).")
+    p_gen.add_argument("template", choices=["beat-sheet", "story-circle", "pas", "bab", "hso", "unity-play", "talking-head", "reel", "youtube", "thirty-acts"],
                        help="Template to generate")
     p_gen.add_argument("--title", default="Untitled", help="Project title")
-    p_gen.add_argument("--protagonist", default="HERO", help="Protagonist name (for story-circle)")
+    p_gen.add_argument("--protagonist", default="HERO", help="Protagonist name (for story-circle or thirty-acts)")
+    p_gen.add_argument("--shadow", default="THE SHADOW", help="Antagonist / Shadow self (for thirty-acts)")
     p_gen.add_argument("--topic", default="your challenge", help="Topic (for email or video templates)")
     p_gen.add_argument("--location", default="A cramped apartment kitchen", help="Location (for unity-play)")
     p_gen.add_argument("--json", action="store_true", help="Output as JSON")
@@ -398,6 +400,23 @@ def main(argv: list[str] | None = None) -> int:
                 print("\n  Retention Invariants:")
                 for g in v_out.retention_guidelines:
                     print(f"    ↳ {g}")
+
+        elif tmpl == "thirty-acts":
+            acts = generate_thirty_act_scaffold(title=args.title, protagonist=args.protagonist, shadow=args.shadow)
+            if args.json:
+                from dataclasses import asdict
+                print(json.dumps([asdict(a) for a in acts], indent=2))
+            else:
+                print(f"🏛️ The 30-Act Structure (The Dav3 Standard) — \"{args.title}\"")
+                print(f"   Protagonist: {args.protagonist} | Shadow: {args.shadow} | Estimated Runtime: ~120 min")
+                print("=" * 65)
+                current_phase = ""
+                for a in acts:
+                    if a.phase != current_phase:
+                        current_phase = a.phase
+                        print(f"\n  [{current_phase}]")
+                    print(f"    Act {a.act_number:2d}: {a.act_name} ({a.pacing_target})")
+                    print(f"            ↳ {a.story_beat}: {a.description}")
 
         return 0
 
