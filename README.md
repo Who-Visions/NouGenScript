@@ -14,12 +14,17 @@ It combines:
    - Authored scripts decompose bijectively into talent-facing display elements (`DIRECTION`, `CUE`, `PAUSE`, `MEDIA`) and speech-recognition / voice-synthesis stream tokens (`SPOKEN`).
 2. **SPITE Psychological Depth Engine**:
    - Character shadow-self tracking, volatility indices ($0.0 \dots 1.0$), teleological core motives, and subtext leakage detection across lines.
-3. **OpenClap Interchange Format (`.clap`)**:
+3. **Deterministic Persona & Behavioral Masks (`persona.py`)**:
+   - Audience / writer persona resolution with deterministic SHA-256 fingerprinting.
+   - 20-Pack composable behavioral masks (`stoic`, `villain`, `witty`, `charming`, `gremlin`, etc.) for director/actor prompts.
+   - 20-Pack emotional spectrum (`ecstatic` $\dots$ `enraged`) for delivery cues and somatic inflection.
+   - Character persona contract with taboo enforcement and vocabulary register bounds.
+4. **OpenClap Interchange Format (`.clap`)**:
    - Universal multi-document YAML serialization compatible with OpenClap multi-track audio-visual timelines (video, dialogue, sound, music).
-4. **Fountain & Screenplay Syntax Parser**:
+5. **Fountain & Screenplay Syntax Parser**:
    - Full parser for Scene Headings (`INT./EXT.`), Characters, Parentheticals, Dialogue, Transitions, and Action beats.
-5. **Deterministic Information Dynamics & Cue Verification**:
-   - Cryptographic SHA-256 script hashing, cue receipts, and zero-context-bloat AST representations.
+6. **Command-Line Interface (`nougenscript`)**:
+   - CLI for parsing, dual-plane projection, SPITE subtext evaluation, OpenClap bundling, and persona mask composition.
 
 ---
 
@@ -42,7 +47,7 @@ Authored Script Source (Fountain / Markdown / YAML)
 
 ### Python Engine
 ```python
-from nougenscript import Screenplay, SpiteProfile, SubtextAnalyzer
+from nougenscript import Screenplay, SpiteProfile, SubtextAnalyzer, CharacterPersona, blend, get_emotion
 
 # Parse a script
 script = Screenplay.from_fountain("""
@@ -65,6 +70,34 @@ profile = SpiteProfile(
 analysis = SubtextAnalyzer.analyze(script.dialogue_lines[0], profile)
 print(analysis.markers)  # ['Defensive Absolutism: fine']
 print(analysis.leakage_detected)  # True
+
+# Compose Behavioral Masks & Emotions
+char = CharacterPersona(
+    character_name="CORBIN",
+    masks=blend("stoic", "villain"),
+    current_emotion=get_emotion("furious"),
+    taboo_words={"mercy"}
+)
+line = char.format_dialogue("The throne belongs to the dust.")
+print(line.parenthetical)  # '(Furious, blunt, biting, demanding accountability.)'
+```
+
+### CLI Usage
+```bash
+# Parse screenplay
+nougenscript parse script.fountain
+
+# Decompose planes and inspect word re-anchoring
+nougenscript dual-plane script.fountain --reanchor 12
+
+# Run SPITE subtext analysis
+nougenscript spite script.fountain --character XOAH --volatility 0.8
+
+# Export to OpenClap (.clap)
+nougenscript export-clap script.fountain -o scene1.clap
+
+# Compose behavioral masks
+nougenscript persona --blend stoic witty --emotion ecstatic --character XOAH
 ```
 
 ---
@@ -73,6 +106,9 @@ print(analysis.leakage_detected)  # True
 - `src/nougenscript/core.py`: Canonical AST nodes (`Scene`, `Dialogue`, `Direction`, `Cue`).
 - `src/nougenscript/dual_plane.py`: Bijective Display vs Speech plane projector and word anchor locator.
 - `src/nougenscript/spite.py`: SPITE psychological depth, character profiling, and subtext analyzer.
+- `src/nougenscript/persona.py`: Signals, deterministic persona resolver, 20 behavioral masks, 20 emotions, and character contract.
 - `src/nougenscript/openclap.py`: Universal `.clap` multi-document YAML stream serializer and parser.
 - `src/nougenscript/parser.py`: Fast, deterministic Fountain and text screenplay parser.
-- `tests/`: Complete pytest test suite verifying all parser, dual-plane, and SPITE invariants.
+- `src/nougenscript/cli.py`: Unified command-line interface.
+- `tests/`: Complete pytest test suite verifying all parser, dual-plane, SPITE, and persona invariants.
+
