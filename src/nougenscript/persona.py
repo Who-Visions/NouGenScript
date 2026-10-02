@@ -77,7 +77,7 @@ class Signals:
     median_words: float = 0.0
     imperative_ratio: float = 0.0
     correction_ratio: float = 0.0
-    tz: str = "America/New_York"
+    tz: str = field(default_factory=lambda: os.getenv("NOUGEN_TZ", "America/New_York"))
     role: str = ""
     tags: Counter = field(default_factory=Counter)
     audience_size: int = 1
@@ -87,12 +87,13 @@ class Signals:
     _lengths: list = field(default_factory=list)
 
     @classmethod
-    def from_texts(cls, texts: Iterable[str], *, surfaces: Iterable[str] = (), tz: str = "America/New_York",
+    def from_texts(cls, texts: Iterable[str], *, surfaces: Iterable[str] = (), tz: Optional[str] = None,
                    hours: Iterable[int] = (), role: str = "", tags: Iterable[str] = (),
                    audience_size: int = 1, stable_days: int = 0,
                    message_max_words: Optional[int] = None) -> Signals:
+        resolved_tz = tz or os.getenv("NOUGEN_TZ", "America/New_York")
         raw_texts = [t for t in texts if isinstance(t, str) and t.strip()]
-        s = cls(tz=tz, role=role, audience_size=max(1, int(audience_size)), stable_days=max(0, int(stable_days)))
+        s = cls(tz=resolved_tz, role=role, audience_size=max(1, int(audience_size)), stable_days=max(0, int(stable_days)))
         s.surfaces.update(x for x in surfaces if x)
         s.active_hours.update(int(h) % 24 for h in hours)
         s.tags.update(x.lower() for x in tags if x)

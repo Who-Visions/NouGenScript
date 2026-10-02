@@ -16,6 +16,7 @@ from __future__ import annotations
 import enum
 import hashlib
 import json
+import os
 import re
 from dataclasses import asdict, dataclass, field
 from typing import Any, Optional
@@ -58,7 +59,7 @@ class ScriptKind(str, enum.Enum):
 @dataclass
 class ScriptMeta:
     title: str
-    author: str = "Who Visions / Dav3"
+    author: str = field(default_factory=lambda: os.getenv("NOUGEN_AUTHOR", "Anonymous Author"))
     kind: ScriptKind = ScriptKind.MOVIE_SCREENPLAY
     domain: ScriptDomain = ScriptDomain.NARRATIVE_FILM
     version: str = "1.0.0"
@@ -109,7 +110,7 @@ class EmailSection:
     call_to_action_url: str
     call_to_action_text: str
     ps_line: str = ""
-    sign_off: str = "Best,\nDave"
+    sign_off: str = field(default_factory=lambda: os.getenv("NOUGEN_SIGN_OFF", "Best Regards"))
 
 
 @dataclass

@@ -166,3 +166,19 @@ class MeshController:
     assert "os" in spec.dependencies
     assert "sys" in spec.dependencies
     assert "run_mesh_diagnostic" in spec.exports
+
+
+def test_dynamic_deterministic_overrides(monkeypatch):
+    monkeypatch.setenv("NOUGEN_AUTHOR", "Dynamic Ghost Writer")
+    monkeypatch.setenv("NOUGEN_SIGN_OFF", "Warmly,\nGhost")
+    monkeypatch.setenv("NOUGEN_TZ", "America/Chicago")
+
+    source = "SUBJECT: Test\nHi Dave,\nCTA: Link | http://example.com"
+    email_poly = UniversalScriptEngine.parse_email_script(source)
+    assert email_poly.meta.author == "Dynamic Ghost Writer"
+    assert email_poly.body.sign_off == "Warmly,\nGhost"
+
+    from nougenscript.persona import Signals
+    sig = Signals.from_texts(["some text"])
+    assert sig.tz == "America/Chicago"
+

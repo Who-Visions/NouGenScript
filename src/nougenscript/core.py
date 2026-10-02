@@ -4,6 +4,7 @@ from __future__ import annotations
 import enum
 import hashlib
 import json
+import os
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
@@ -108,7 +109,7 @@ class Scene:
 @dataclass
 class Screenplay:
     title: str
-    author: str = "Who Visions / Dav3"
+    author: str = field(default_factory=lambda: os.getenv("NOUGEN_AUTHOR", "Anonymous Author"))
     scenes: list[Scene] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
     script_hash: str = ""
