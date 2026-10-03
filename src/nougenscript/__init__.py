@@ -89,6 +89,10 @@ from nougenscript.templates import (
     generate_thirty_act_scaffold,
     generate_unity_outline,
     generate_youtube_longform_template,
+    UDCTCalculationResult,
+    UDCTFrameState,
+    UDCTInputState,
+    UniversalDeterministicCalculatedTemplate,
 )
 from nougenscript.validators import (
     AristotleUnitiesValidator,
@@ -110,8 +114,28 @@ from nougenscript.validators import (
     ValidationReport,
     VideoRetentionValidator,
 )
+from nougenscript.morph import (
+    AdoptionState,
+    CalculatedMetric,
+    CanonicalSemanticUnit,
+    EvidenceCompiler,
+    JoyceRecursionTransformer,
+    MetricStatus,
+    MorphCandidate,
+    MorphEvidence,
+    MorphFinding,
+    MorphKind,
+    NouGenMorphEngine,
+    PortmanteauDecomposer,
+    PortmanteauToken,
+    RecursiveLoopMetadata,
+    SemanticUnitMetrics,
+    StreamOfConsciousnessMorph,
+    UniversalCalculatedTemplate,
+    UniversalMorphEngine,
+)
 
-__version__ = "0.8.0"
+__version__ = "0.9.0"
 __all__ = [
     # Core AST
     "Audience",
@@ -218,4 +242,34 @@ __all__ = [
     "generate_thirty_act_scaffold",
     "generate_unity_outline",
     "generate_youtube_longform_template",
+    # NouGenMorph & Joyce Recursion
+    "AdoptionState",
+    "CanonicalSemanticUnit",
+    "EvidenceCompiler",
+    "JoyceRecursionTransformer",
+    "MorphCandidate",
+    "MorphEvidence",
+    "MorphFinding",
+    "MorphKind",
+    "NouGenMorphEngine",
+    "PortmanteauDecomposer",
+    "PortmanteauToken",
+    "RecursiveLoopMetadata",
+    "SemanticUnitMetrics",
+    "StreamOfConsciousnessMorph",
+    # Universal Deterministic Calculated Templates (UDCT)
+    "EasingType",
+    "FrameCalculatedState",
+    "MathFunctions",
+    "UniversalDeterministicEngine",
+    "UniversalStateConfig",
 ]
+
+from nougenscript.udct import (
+    EasingType,
+    FrameCalculatedState,
+    MathFunctions,
+    UniversalDeterministicEngine,
+    UniversalStateConfig,
+)
+

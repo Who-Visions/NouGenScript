@@ -145,7 +145,28 @@ def main(argv: list[str] | None = None) -> int:
     p_inst.add_argument("--category", default=None, help="Instinct category (e.g. dialogue, pacing)")
     p_inst.add_argument("--pattern", default=None, help="Trigger pattern (for record)")
     p_inst.add_argument("--response", default=None, help="Reflex response (for record)")
-    p_inst.add_argument("--confidence", type=float, default=0.5, help="Confidence score")
+    # 13. NouGenMorph & Joyce Recursion & Evidence Compiler
+    p_morph = sub.add_parser("morph", help="NouGenMorph cognitive ingestion, evidence compiler, Joyce recursion loop, and portmanteau decomposition.")
+    p_morph.add_argument("mode", choices=["joyce", "eval", "decompose", "compile"], help="Morph mode to run")
+    p_morph.add_argument("--file", type=Path, default=None, help="Input screenplay or text file")
+    p_morph.add_argument("--unit", default="riverrun", help="Semantic unit token to compile mathematically")
+    p_morph.add_argument("--provenance", default="archive.org/stream/in.ernet.dli.2015.207614", help="Provenance source label")
+    p_morph.add_argument("--title", default="Finnegans Recirculation", help="Title of morphed script")
+    p_morph.add_argument("--word", default=None, help="Single word/portmanteau to decompose")
+    p_morph.add_argument("--json", action="store_true", help="Output raw JSON analysis")
+
+    # 14. Universal Deterministic Calculated Templates (UDCT)
+    p_udct = sub.add_parser("udct", help="Universal Deterministic Calculated Template engine: Output = T(calculated values).")
+    p_udct.add_argument("--duration", type=float, default=10.0, help="Duration in seconds (e.g. 10.0)")
+    p_udct.add_argument("--fps", type=int, default=30, help="Frames / steps per second (e.g. 30)")
+    p_udct.add_argument("--subject", default="Xoah", help="Universal subject name (Xoah, Ravenous, Camera, UI, Synth)")
+    p_udct.add_argument("--action", default="sprint", help="Action / verb (sprint, pan, modulate)")
+    p_udct.add_argument("--start", type=float, default=0.0, help="Start position scalar")
+    p_udct.add_argument("--end", type=float, default=18.0, help="End position scalar")
+    p_udct.add_argument("--easing", default="ease_in_out_cubic", choices=["linear", "ease_in_quad", "ease_out_quad", "ease_in_out_quad", "ease_in_cubic", "ease_out_cubic", "ease_in_out_cubic", "sinusoidal"], help="Mathematical easing curve")
+    p_udct.add_argument("--camera-offset", type=float, default=0.17, help="Camera phase offset")
+    p_udct.add_argument("--frames", nargs="+", type=int, default=[0, 150, 299], help="Specific frame indices to sample and render")
+    p_udct.add_argument("--json", action="store_true", help="Output raw calculated state machine snapshots as JSON")
 
     args = parser.parse_args(argv)
 
@@ -541,6 +562,175 @@ def main(argv: list[str] | None = None) -> int:
         elif act == "context":
             prompt = recorder.build_constraint_context(category=args.category)
             print(prompt if prompt else "No high-confidence instincts recorded yet.")
+        return 0
+
+    if args.command == "morph":
+        from nougenscript.morph import (
+            JoyceRecursionTransformer,
+            MorphCandidate,
+            MorphEvidence,
+            MorphKind,
+            NouGenMorphEngine,
+            PortmanteauDecomposer,
+            StreamOfConsciousnessMorph,
+        )
+
+        if args.mode == "joyce":
+            if args.file and args.file.exists():
+                text = args.file.read_text(encoding="utf-8")
+                sp = FountainParser.parse(text)
+                JoyceRecursionTransformer.apply_circular_loop(sp)
+            else:
+                poly = StreamOfConsciousnessMorph.create_joycean_script(title=args.title)
+                sp = poly.body
+
+            analysis = JoyceRecursionTransformer.verify_recirculation(sp)
+            if args.json:
+                print(json.dumps(analysis, indent=2))
+            else:
+                print(f"🌀 Joyce Recursion Manifold (Finnegans Wake Morph) — {args.title}")
+                print(f"  • Valid Manifold: {'✅ TRUE' if analysis['valid_manifold'] else '❌ FALSE'}")
+                print(f"  • Opening Anchor: \"{analysis['opening_anchor']}\"")
+                print(f"  • Terminal Anchor: \"{analysis['terminal_anchor']}\"")
+                print(f"  • Completed Loop: \"{analysis['completed_loop_sentence']}\"")
+                print(f"  • Scenes: {len(sp.scenes)} | Dialogues: {len(sp.dialogue_lines)}")
+            return 0
+
+        elif args.mode == "decompose":
+            target_word = args.word or "bababadalgharaghtakamminarronnkonnbronntonnerronntuonnthunntrovarrhounawnskawntoohoohoordenenthurnuk"
+            tok = PortmanteauDecomposer.decompose_word(target_word)
+            if args.json:
+                print(json.dumps(tok.__dict__, indent=2))
+            else:
+                print(f"🧩 Portmanteau Decomposition — \"{tok.surface_form}\"")
+                print(f"  • Roots: {', '.join(tok.roots)}")
+                print(f"  • Languages: {', '.join(tok.languages)}")
+                print(f"  • Spoken Plane: \"{tok.phonetic_spoken}\"")
+                print(f"  • Display Plane: \"{tok.display_visual}\"")
+                print(f"  • Subtext Echo: {tok.archetypal_subtext}")
+            return 0
+
+        elif args.mode == "eval":
+            cand = MorphCandidate(
+                name="finnegans_wake_circular_recirculation",
+                kind=MorphKind.RECURSIVE_MOTIF,
+                donor_source="James Joyce / Finnegans Wake (1939)",
+                donor_behavior="Terminal fragment flows into genesis sentence ('riverrun')",
+                generalized_behavior="Circular AST boundary closure for AI video/audio infinite loop scripts",
+                nougen_target="nougenscript.morph.JoyceRecursionTransformer",
+                evidence=[
+                    MorphEvidence(
+                        source="https://archive.org/stream/in.ernet.dli.2015.207614/2015.207614.Finnegans-Wake_djvu.txt",
+                        claim="Opening 'riverrun...' completes terminal 'A way a lone a last a loved a long the'",
+                        confidence=1.0,
+                        evidence_type="paper_body",
+                    )
+                ],
+                usefulness=0.95,
+                generalizability=0.90,
+                verifiability=0.95,
+                compatibility=0.92,
+                reversibility=1.0,
+                integration_cost=0.05,
+            )
+            engine = NouGenMorphEngine(acceptance_threshold=0.50)
+            accepted, score = engine.ingest_candidate(cand)
+            if args.json:
+                print(json.dumps(cand.to_dict(), indent=2))
+            else:
+                icon = "✅ ADOPTED" if accepted else "❌ REJECTED"
+                print(f"🔬 NouGenMorph Candidate Ingestion — {icon}")
+                print(f"  • Candidate: {cand.name} [{cand.kind.value}]")
+                print(f"  • Score: {score:.4f} (Effective: {cand.effective_score():.4f}, Threshold: 0.50)")
+                print(f"  • Donor: {cand.donor_source}")
+                print(f"  • Target: {cand.nougen_target}")
+            return 0
+
+        elif args.mode == "compile":
+            from nougenscript.morph import EvidenceCompiler
+            segments = []
+            if args.file and args.file.exists():
+                raw = args.file.read_text(encoding="utf-8")
+                # Split by double newlines or chapter markers into corpus segments
+                segments = [s.strip() for s in raw.split("\n\n") if s.strip()]
+            if not segments:
+                # Default Finnegans Wake canonical test segments
+                segments = [
+                    "riverrun, past Eve and Adam's, from swerve of shore to bend of bay, brings us by a commodius vicus of recirculation back to Howth Castle and Environs.",
+                    "Sir Tristram, violer d'amores, fr'over the short sea, had passencore rearrived from North Armorica on this side the scraggy isthmus of Europe Minor.",
+                    "The fall of a once wallstrait oldparr is retaled early in bed and later on life down through all christian minstrelsy.",
+                    "bababadalgharaghtakamminarronnkonnbronntonnerronntuonnthunntrovarrhounawnskawntoohoohoordenenthurnuk!",
+                    "What clashes here of wills gen wonts, oystrygods gag sag rahexeption, liddle me, liddle me, liddle me!",
+                    "Finn, again! Take. Bussoftlhee, mememormee! Till thousendsthee. Lps. The keys to. Given! A way a lone a last a loved a long the riverrun",
+                ]
+
+            unit = EvidenceCompiler.compile_semantic_unit(
+                unit=args.unit,
+                corpus_segments=segments,
+                provenance=args.provenance,
+            )
+            if args.json:
+                print(json.dumps(unit.to_dict(), indent=2))
+            else:
+                print(f"🧮 Canonical Evidence Compiler — [{unit.template}] Unit: \"{unit.unit}\"")
+                print(f"  • Canonical Hash: {unit.canonical_hash}")
+                print(f"  • Mathematical Score: {unit.score:.4f} | Confidence: {unit.confidence:.4f}")
+                print("  • Calculated Metrics:")
+                for k, v in unit.metrics.items():
+                    w = unit.weights.get(k, 0.0)
+                    print(f"      {k:<20} = {v:.4f}  (weight: {w:.4f})")
+                print("  • Governing Equations:")
+                for eq_name, eq_form in unit.equations.items():
+                    print(f"      {eq_name:<15} : {eq_form}")
+            return 0
+
+    # ------------------------------------------------------------------- #
+    # 14. Universal Deterministic Calculated Templates (UDCT)
+    # ------------------------------------------------------------------- #
+    if args.command == "udct":
+        from nougenscript.udct import (
+            EasingType,
+            UniversalDeterministicEngine,
+            UniversalStateConfig,
+        )
+
+        cfg = UniversalStateConfig(
+            duration=args.duration,
+            fps=args.fps,
+            subject=args.subject,
+            action=args.action,
+            start_pos=(args.start, 0.0, 0.0),
+            end_pos=(args.end, 0.0, 0.0),
+            easing=EasingType(args.easing),
+            camera_offset=args.camera_offset,
+        )
+        states = UniversalDeterministicEngine.calculate_trajectory(cfg)
+
+        if args.json:
+            print(json.dumps([s.to_dict() for s in states], indent=2))
+            return 0
+
+        template_spec = (
+            "============================================================\n"
+            "🎬 FRAME {{frame_index}} / {{total_frames}} (t = {{t}}s, E(t) = {{eased_t}})\n"
+            "------------------------------------------------------------\n"
+            "  • Subject          : {{subject}} [Action: {{action}}]\n"
+            "  • Position (x,y,z) : ({{calc_position_x}}, {{calc_position_y}}, {{calc_position_z}})\n"
+            "  • Velocity (dx/dt) : {{velocity_x}} u/s\n"
+            "  • Intensity (I(t)) : {{intensity}} [Phase: {{phase}} rad]\n"
+            "  • Camera Orbit     : Yaw {{calc_camera_yaw}}° | Pitch {{calc_camera_pitch}}° | Pos ({{calc_camera_x}}, {{calc_camera_y}}, {{calc_camera_z}})\n"
+            "  • Invariant Hash   : {{state_hash}}\n"
+        )
+
+        print(f"🧬 NouGen UDCT Engine — [UDCT = G(S, Θ, F, C)]")
+        print(f"  • Subject: {cfg.subject} | Duration: {cfg.duration}s @ {cfg.fps} FPS ({cfg.total_frames} total frames)")
+        print(f"  • Domain Model: Pos [{args.start} -> {args.end}], Easing: {args.easing}, Camera Offset: {args.camera_offset}")
+        print(f"  • Verification Invariant: Deterministic mathematical state -> Template expression renderer\n")
+
+        for f_idx in args.frames:
+            if 0 <= f_idx < len(states):
+                rendered = UniversalDeterministicEngine.render_template(template_spec, states[f_idx], cfg)
+                print(rendered)
         return 0
 
     return 0
