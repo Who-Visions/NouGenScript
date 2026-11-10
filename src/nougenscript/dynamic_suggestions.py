@@ -150,13 +150,13 @@ def suggest_dynamic_literals(source: str | Path, ref: str | None = None) -> list
             if not candidate.is_relative_to(root) or not candidate.is_file():
                 continue
             try:
-                size = candidate.stat().st_size
-                if size > 1_000_000:
+                with candidate.open("rb") as source_file:
+                    content = source_file.read(1_000_001)
+                if len(content) > 1_000_000:
                     continue
-                total_bytes += size
+                total_bytes += len(content)
                 if total_bytes > 100_000_000:
                     raise ValueError("source exceeds the 100 MB text scan limit")
-                content = candidate.read_bytes()
             except OSError as exc:
                 raise ValueError(f"cannot read source file {relative}") from exc
             if b"\0" in content:

@@ -133,13 +133,13 @@ def audit_dynamic_literals(root: str | Path, policy: str | Path = ".udct-policy.
         if not candidate.is_file():
             continue
         try:
-            size = candidate.stat().st_size
-            if size > _MAX_FILE_BYTES:
+            with candidate.open("rb") as source_file:
+                content = source_file.read(_MAX_FILE_BYTES + 1)
+            if len(content) > _MAX_FILE_BYTES:
                 continue
-            total_bytes += size
+            total_bytes += len(content)
             if total_bytes > _MAX_TOTAL_BYTES:
                 raise ValueError("repository exceeds the 100 MB policy scan limit; narrow the audit scope")
-            content = candidate.read_bytes()
         except ValueError:
             raise
         except OSError as exc:

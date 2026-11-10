@@ -144,6 +144,17 @@ def test_targeted_symlink_cannot_escape_repository(tmp_path):
         audit_dynamic_literals(root)
 
 
+def test_policy_scan_skips_oversized_files_with_a_bounded_read(tmp_path):
+    root = _git_repo(tmp_path / "repo")
+    source = root / "large.py"
+    source.write_text('HOST = "value"\n' + ("# padding\n" * 110_000), encoding="utf-8")
+    subprocess.run(["git", "-C", str(root), "add", source.name], check=True)
+    _write_policy(root, [{"id": "host", "literal": "value", "paths": ["*.py"],
+                         "slot": "HOST", "rationale": "Environment-dependent host."}])
+
+    assert audit_dynamic_literals(root) == []
+
+
 def test_cli_help_renders_without_percent_format_error(capsys):
     with pytest.raises(SystemExit) as error:
         main(["--help"])
