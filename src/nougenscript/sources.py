@@ -36,8 +36,10 @@ def _github_repository_url(source: str) -> str:
 
 
 def _clone_public_or_authenticated(url: str, destination: Path, ref: str | None) -> None:
+    hooks_directory = destination.parent / "hooks-disabled"
+    hooks_directory.mkdir(mode=0o700)
     command = [
-        "git", "-c", f"core.hooksPath={os.devnull}", "clone", "--depth=1", "--single-branch",
+        "git", "-c", f"core.hooksPath={hooks_directory.as_posix()}", "clone", "--depth=1", "--single-branch",
         "--filter=blob:limit=1m", "--no-tags", url, str(destination),
     ]
     if ref:
