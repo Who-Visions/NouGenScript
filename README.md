@@ -195,24 +195,31 @@ non-code context. It never edits the repository.
 nougenscript plan-dynamic . --json
 ```
 
-For local Python repositories, `apply-dynamic` adds a conservative adapter for
-exact standalone string literals covered by the policy. It skips comments,
-docstrings, annotations, unsupported languages, and contexts it cannot safely
-map; the repository is never executed. Without `--write`, it prints a
-value-free preview and a plan ID bound to hashes of the exact source/result
-files. Review `plan-dynamic` and the preview, then pass that ID with `--write`.
-Writes change only clean `.py` targets and validate resulting syntax. Supply
-the named environment variables before running the application. GitHub URLs
-remain read-only: clone the repository locally before applying a change.
+For local repositories, `apply-dynamic` has conservative Python and
+JavaScript/TypeScript adapters for exact standalone string literals covered by
+the policy. Python changes skip comments, docstrings, annotations, and
+unmatched contexts. JavaScript/TypeScript changes use bundled Tree-sitter
+grammars, accept only direct variable, object-property, and assignment values,
+and leave escaped literals and other expression contexts unresolved. The
+JavaScript/TypeScript resolution targets Node.js `process.env`; review the
+target runtime before applying it to `.js`, `.jsx`, `.mjs`, `.cjs`, `.ts`, or
+`.tsx` files. Neither adapter executes the repository. Without `--write`, the
+command prints a value-free preview and a plan ID bound to hashes of the exact
+source/result files. Review `plan-dynamic` and the preview, then pass that ID
+with `--write`. Writes change only clean targets and validate resulting syntax.
+Supply the named environment variables before running the application. GitHub
+URLs remain read-only: clone the repository locally before applying a change.
 
 ```bash
 nougenscript apply-dynamic ./service --json
 nougenscript apply-dynamic ./service --write --confirm PLAN_ID --json
 ```
 
-Automatic application is currently Python-only. Other languages receive
-reviewable resolution plans, but are not rewritten until UDCT has a
-language-aware adapter and syntax validation for them.
+Automatic application is currently limited to Python and Node.js-oriented
+JavaScript/TypeScript contexts. Other languages receive reviewable resolution
+plans, but are not rewritten until UDCT has a language-aware adapter and syntax
+validation for them. Each adapter leaves unresolved syntax it cannot map
+confidently; reviewers must validate application-specific runtime behavior.
 
 For an initial read-only inventory without a policy, use `suggest-dynamic`.
 It looks for assignment-shaped service URLs, absolute paths, and operational

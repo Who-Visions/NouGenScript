@@ -191,6 +191,118 @@ def _prepare_file(
     return rewritten, len(edits), len(edits) != len(by_location), original_bytes
 
 
+def _tree_sitter_parser(path: Path):
+    """Create a pinned, in-process JS/TS parser without fetching grammars at runtime."""
+    from tree_sitter import Language, Parser
+
+    suffix = path.suffix.lower()
+    if suffix in {".js", ".jsx", ".mjs", ".cjs"}:
+        import tree_sitter_javascript
+
+        grammar = tree_sitter_javascript.language()
+    else:
+        import tree_sitter_typescript
+
+        grammar = (tree_sitter_typescript.language_tsx() if suffix == ".tsx"
+                   else tree_sitter_typescript.language_typescript())
+    return Parser(Language(grammar))
+
+
+def _parse_js_ts(parser: Any, source: bytes) -> Any:
+    return parser.parse(source)
+
+
+def _is_js_initializer(node: Any) -> bool:
+    """Limit JS/TS writes to direct variable, object-property, and assignment values."""
+    parent = node.parent
+    if parent is None:
+        return False
+    return (
+        (parent.type == "variable_declarator" and parent.child_by_field_name("value") == node)
+        or (parent.type == "pair" and parent.child_by_field_name("value") == node)
+        or (parent.type == "assignment_expression" and parent.child_by_field_name("right") == node)
+    )
+
+
+def _prepare_js_ts_file(
+    path: Path, relative: str, rules: list[dict[str, Any]], findings: list[Any]
+) -> tuple[str | None, int, bool, bytes]:
+    """Prepare exact, syntax-checked JavaScript/TypeScript initializer rewrites.
+
+    Escaped strings and other expression contexts remain unresolved. The parser
+    establishes syntax and token boundaries; only complete, unescaped string
+    values at direct initializer sites can be replaced.
+    """
+    with path.open("rb") as source_file:
+        original_bytes = source_file.read(1_000_001)
+    if len(original_bytes) > 1_000_000:
+        raise ValueError(f"cannot safely transform {relative}: source exceeds the 1 MB parser limit")
+    try:
+        original_bytes.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValueError(f"cannot safely transform {relative}: source is not UTF-8") from exc
+    parser = _tree_sitter_parser(path)
+    tree = _parse_js_ts(parser, original_bytes)
+    if tree is None:
+        raise ValueError(f"cannot safely transform {relative}: parser could not produce a syntax tree")
+    if tree.root_node.has_error:
+        raise ValueError(f"cannot safely transform {relative}: invalid or unsupported JavaScript/TypeScript syntax")
+
+    rule_by_id = {rule["id"]: rule for rule in rules}
+    by_location: dict[tuple[int, int], Any] = {}
+    for finding in findings:
+        key = (finding.line, finding.column)
+        previous = by_location.get(key)
+        if previous is not None and previous.slot != finding.slot:
+            raise ValueError(f"conflicting UDCT slots target {relative}:{finding.line}")
+        by_location[key] = finding
+
+    line_starts = [0]
+    line_starts.extend(index + 1 for index, byte in enumerate(original_bytes) if byte == 0x0A)
+    nodes_by_location: dict[tuple[int, int], Any] = {}
+    stack = [tree.root_node]
+    while stack:
+        node = stack.pop()
+        if node.type == "string" and _is_js_initializer(node):
+            line_index = node.start_point.row
+            content_start = node.start_byte + 1
+            line_start = line_starts[line_index]
+            column = len(original_bytes[line_start:content_start].decode("utf-8")) + 1
+            nodes_by_location[(line_index + 1, column)] = node
+        stack.extend(reversed(node.children))
+
+    edits: list[tuple[int, int, bytes]] = []
+    for finding in by_location.values():
+        rule = rule_by_id[finding.rule_id]
+        literal = rule["literal"]
+        node = nodes_by_location.get((finding.line, finding.column))
+        if node is not None:
+            token = original_bytes[node.start_byte:node.end_byte]
+            if len(token) < 2 or token[:1] not in (b"'", b'"') or token[-1:] != token[:1]:
+                continue
+            value = token[1:-1]
+            if b"\\" in value or value != literal:
+                continue
+            slot = rule["slot"]
+            escaped_slot = json.dumps(slot, ensure_ascii=True)
+            replacement = (
+                f"process.env[{escaped_slot}] ?? (() => {{ throw new Error({json.dumps(slot + ' must be set')}); }})()"
+            ).encode("ascii")
+            edits.append((node.start_byte, node.end_byte, replacement))
+
+    if not edits:
+        return None, 0, bool(findings), original_bytes
+    rewritten = original_bytes
+    for start, end, replacement in sorted(edits, reverse=True):
+        rewritten = rewritten[:start] + replacement + rewritten[end:]
+    rewritten_tree = _parse_js_ts(parser, rewritten)
+    if rewritten_tree is None:
+        raise ValueError(f"cannot safely transform {relative}: parser could not validate generated syntax")
+    if rewritten_tree.root_node.has_error:
+        raise ValueError(f"cannot safely transform {relative}: generated JavaScript/TypeScript syntax is invalid")
+    return rewritten.decode("utf-8"), len(edits), len(edits) != len(by_location), original_bytes
+
+
 def apply_dynamic_resolutions(
     root: str | Path,
     policy: str | Path = ".udct-policy.json",
@@ -198,10 +310,10 @@ def apply_dynamic_resolutions(
     write: bool = False,
     confirm: str | None = None,
 ) -> ApplyReport:
-    """Prepare or explicitly write exact policy-backed Python rewrites.
+    """Prepare or explicitly write exact policy-backed Python and JS/TS rewrites.
 
     The default is a value-free preview. Writes are limited to a local Git root,
-    Python files with exact standalone string-token matches, and clean target files.
+    supported source files with exact syntax-backed matches, and clean targets.
     """
     root_text = str(root)
     if root_text.startswith(("https://", "http://", "git@")):
@@ -226,10 +338,16 @@ def apply_dynamic_resolutions(
         path = (repo / relative).resolve(strict=True)
         if not path.is_relative_to(repo):
             raise ValueError(f"tracked path escapes repository through a symlink: {relative}")
-        if path.suffix.lower() != ".py":
+        suffix = path.suffix.lower()
+        if suffix in {".py", ".pyi"}:
+            content, count, has_unresolved, original_bytes = _prepare_file(path, relative, rules, file_findings)
+        elif suffix in {".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx"}:
+            content, count, has_unresolved, original_bytes = _prepare_js_ts_file(
+                path, relative, rules, file_findings
+            )
+        else:
             unresolved.add(relative)
             continue
-        content, count, has_unresolved, original_bytes = _prepare_file(path, relative, rules, file_findings)
         if content is None:
             unresolved.add(relative)
             continue

@@ -209,7 +209,7 @@ def main(argv: list[str] | None = None) -> int:
 
     p_apply = sub.add_parser(
         "apply-dynamic",
-        help="Prepare exact policy-backed Python resolutions; --write explicitly edits clean local files.",
+        help="Prepare exact policy-backed Python and Node.js JS/TS resolutions; --write edits clean local files.",
     )
     p_apply.add_argument("source", help="Local Git repository (remote URLs are read-only)")
     p_apply.add_argument("--policy", type=Path, default=Path(".udct-policy.json"), help="JSON policy path")
