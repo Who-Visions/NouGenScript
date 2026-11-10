@@ -195,16 +195,19 @@ non-code context. It never edits the repository.
 nougenscript plan-dynamic . --json
 ```
 
-For local repositories, `apply-dynamic` has conservative Python and
-JavaScript/TypeScript adapters for exact standalone string literals covered by
-the policy. Python changes skip comments, docstrings, annotations, and
-unmatched contexts. JavaScript/TypeScript changes use bundled Tree-sitter
-grammars, accept only direct variable, object-property, and assignment values,
-and leave escaped literals and other expression contexts unresolved. The
-JavaScript/TypeScript resolution targets Node.js `process.env`; review the
-target runtime before applying it to `.js`, `.jsx`, `.mjs`, `.cjs`, `.ts`, or
-`.tsx` files. Neither adapter executes the repository. Without `--write`, the
-command prints a value-free preview and a plan ID bound to hashes of the exact
+For local repositories, `apply-dynamic` has conservative Python,
+JavaScript/TypeScript, Go, and Java adapters for exact standalone string
+literals covered by the policy. Python changes skip comments, docstrings,
+annotations, and unmatched contexts. JavaScript/TypeScript, Go, and Java use
+bundled Tree-sitter grammars and only rewrite recognized runtime initializer
+contexts; escaped literals and unsupported expressions remain unresolved.
+JavaScript/TypeScript targets Node.js `process.env`; Go targets `os.LookupEnv`
+(adding the standard-library import when needed); Java targets a non-null
+`System.getenv` value using `java.util.Objects.requireNonNull`. Go constants
+and Java `final` or implicit interface constants remain unresolved. Review the
+target runtime and type behavior before applying. None of these adapters
+executes the repository. Without `--write`, the command
+prints a value-free preview and a plan ID bound to hashes of the exact
 source/result files. Review `plan-dynamic` and the preview, then pass that ID
 with `--write`. Writes change only clean targets and validate resulting syntax.
 Supply the named environment variables before running the application. GitHub
@@ -215,11 +218,12 @@ nougenscript apply-dynamic ./service --json
 nougenscript apply-dynamic ./service --write --confirm PLAN_ID --json
 ```
 
-Automatic application is currently limited to Python and Node.js-oriented
-JavaScript/TypeScript contexts. Other languages receive reviewable resolution
-plans, but are not rewritten until UDCT has a language-aware adapter and syntax
-validation for them. Each adapter leaves unresolved syntax it cannot map
-confidently; reviewers must validate application-specific runtime behavior.
+Automatic application is currently limited to the Python, Node.js-oriented
+JavaScript/TypeScript, Go, and Java contexts described above. Other languages
+receive reviewable resolution plans, but are not rewritten until UDCT has a
+language-aware adapter and syntax validation for them. Each adapter leaves
+unresolved syntax it cannot map confidently; reviewers must validate
+application-specific runtime behavior.
 
 For an initial read-only inventory without a policy, use `suggest-dynamic`.
 It looks for assignment-shaped service URLs, absolute paths, and operational

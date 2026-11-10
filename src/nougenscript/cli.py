@@ -209,7 +209,7 @@ def main(argv: list[str] | None = None) -> int:
 
     p_apply = sub.add_parser(
         "apply-dynamic",
-        help="Prepare exact policy-backed Python and Node.js JS/TS resolutions; --write edits clean local files.",
+        help="Prepare exact policy-backed Python, Node.js JS/TS, Go, and Java resolutions; --write edits clean local files.",
     )
     p_apply.add_argument("source", help="Local Git repository (remote URLs are read-only)")
     p_apply.add_argument("--policy", type=Path, default=Path(".udct-policy.json"), help="JSON policy path")
@@ -290,7 +290,7 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps(report.to_dict(), sort_keys=True, indent=2))
         else:
             action = "Updated" if report.written else "Prepared (no files changed)"
-            print(f"{action}: {report.replacements} exact Python literal(s) in {len(report.changed_files)} file(s).")
+            print(f"{action}: {report.replacements} exact literal(s) in {len(report.changed_files)} file(s).")
             if report.changed_files:
                 print("Files: " + ", ".join(report.changed_files))
             if report.unresolved:

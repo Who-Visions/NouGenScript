@@ -192,7 +192,7 @@ def _prepare_file(
 
 
 def _tree_sitter_parser(path: Path):
-    """Create a pinned, in-process JS/TS parser without fetching grammars at runtime."""
+    """Create a pinned, in-process parser without fetching grammars at runtime."""
     from tree_sitter import Language, Parser
 
     suffix = path.suffix.lower()
@@ -200,11 +200,21 @@ def _tree_sitter_parser(path: Path):
         import tree_sitter_javascript
 
         grammar = tree_sitter_javascript.language()
-    else:
+    elif suffix in {".ts", ".tsx"}:
         import tree_sitter_typescript
 
         grammar = (tree_sitter_typescript.language_tsx() if suffix == ".tsx"
                    else tree_sitter_typescript.language_typescript())
+    elif suffix == ".go":
+        import tree_sitter_go
+
+        grammar = tree_sitter_go.language()
+    elif suffix == ".java":
+        import tree_sitter_java
+
+        grammar = tree_sitter_java.language()
+    else:
+        raise ValueError(f"cannot safely transform {path.name}: unsupported language")
     return Parser(Language(grammar))
 
 
@@ -303,6 +313,194 @@ def _prepare_js_ts_file(
     return rewritten.decode("utf-8"), len(edits), len(edits) != len(by_location), original_bytes
 
 
+def _tree_text(source: bytes, node: Any) -> bytes:
+    return source[node.start_byte:node.end_byte]
+
+
+def _is_go_runtime_initializer(node: Any) -> bool:
+    parent = node.parent
+    if parent is None or parent.type != "expression_list":
+        return False
+    declaration = parent.parent
+    if declaration is None:
+        return False
+    if declaration.type in {"short_var_declaration", "assignment_statement"}:
+        return declaration.child_by_field_name("right") == parent
+    if declaration.type == "var_spec":
+        # Go constants are compile-time expressions and must never be rewritten.
+        return declaration.child_by_field_name("value") == parent
+    return False
+
+
+def _go_os_import(root: Any, source: bytes) -> tuple[bool, str | None]:
+    stack = [root]
+    while stack:
+        node = stack.pop()
+        if node.type == "import_spec":
+            path = node.child_by_field_name("path")
+            if path is not None and _tree_text(source, path) == b'"os"':
+                alias = node.child_by_field_name("name")
+                name = _tree_text(source, alias).decode("ascii") if alias is not None else "os"
+                return True, None if name in {".", "_"} else name
+        stack.extend(node.children)
+    return False, None
+
+
+def _prepare_go_file(
+    path: Path, relative: str, rules: list[dict[str, Any]], findings: list[Any]
+) -> tuple[str | None, int, bool, bytes]:
+    original = path.read_bytes()
+    if len(original) > 1_000_000:
+        raise ValueError(f"cannot safely transform {relative}: source exceeds the 1 MB parser limit")
+    try:
+        original.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValueError(f"cannot safely transform {relative}: source is not UTF-8") from exc
+    parser = _tree_sitter_parser(path)
+    tree = parser.parse(original)
+    if tree is None or tree.root_node.has_error:
+        raise ValueError(f"cannot safely transform {relative}: invalid or unsupported Go syntax")
+    has_os_import, os_name = _go_os_import(tree.root_node, original)
+    if has_os_import and os_name is None:
+        # Dot and blank imports cannot be referenced by generated expressions.
+        return None, 0, bool(findings), original
+    os_name = os_name or "os"
+
+    rule_by_id = {rule["id"]: rule for rule in rules}
+    by_location = {(finding.line, finding.column): finding for finding in findings}
+    starts = [0]
+    starts.extend(index + 1 for index, byte in enumerate(original) if byte == 0x0A)
+    candidates: dict[tuple[int, int], Any] = {}
+    stack = [tree.root_node]
+    while stack:
+        node = stack.pop()
+        if node.type == "interpreted_string_literal" and _is_go_runtime_initializer(node):
+            row = node.start_point.row
+            column = len(original[starts[row]:node.start_byte + 1].decode("utf-8")) + 1
+            candidates[(row + 1, column)] = node
+        stack.extend(node.children)
+
+    edits: list[tuple[int, int, bytes]] = []
+    for location, finding in by_location.items():
+        node = candidates.get(location)
+        if node is None:
+            continue
+        rule = rule_by_id[finding.rule_id]
+        token = _tree_text(original, node)
+        literal = rule["literal"]
+        if len(token) < 2 or token[:1] != b'"' or token[-1:] != b'"' or token[1:-1] != literal:
+            continue
+        slot_literal = json.dumps(rule["slot"], ensure_ascii=True)
+        message_literal = json.dumps(rule["slot"] + " must be set", ensure_ascii=True)
+        replacement = (
+            f"func() string {{ value, ok := {os_name}.LookupEnv({slot_literal}); "
+            f"if !ok {{ panic({message_literal}) }}; return value }}()"
+        ).encode("ascii")
+        edits.append((node.start_byte, node.end_byte, replacement))
+
+    if not edits:
+        return None, 0, bool(findings), original
+    rewritten = original
+    for start, end, replacement in sorted(edits, reverse=True):
+        rewritten = rewritten[:start] + replacement + rewritten[end:]
+    if not has_os_import:
+        package = next((node for node in tree.root_node.children if node.type == "package_clause"), None)
+        if package is None:
+            raise ValueError(f"cannot safely transform {relative}: package clause is unavailable")
+        insertion = package.end_byte
+        newline = b"\r\n" if b"\r\n" in original else b"\n"
+        rewritten = rewritten[:insertion] + newline + b'import "os"' + rewritten[insertion:]
+    checked = parser.parse(rewritten)
+    if checked is None or checked.root_node.has_error:
+        raise ValueError(f"cannot safely transform {relative}: generated Go syntax is invalid")
+    return rewritten.decode("utf-8"), len(edits), len(edits) != len(by_location), original
+
+
+def _is_java_runtime_initializer(node: Any) -> bool:
+    parent = node.parent
+    if parent is None:
+        return False
+    if parent.type == "variable_declarator" and parent.child_by_field_name("value") == node:
+        declaration = parent.parent
+        if declaration is None:
+            return False
+        if declaration.type not in {"local_variable_declaration", "field_declaration"}:
+            return False
+        modifiers = declaration.child_by_field_name("modifiers")
+        if modifiers is None:
+            modifiers = next((child for child in declaration.children if child.type == "modifiers"), None)
+        if modifiers is not None and b"final" in modifiers.text:
+            # A final primitive/String variable can be a compile-time constant.
+            return False
+        ancestor = declaration.parent
+        while ancestor is not None:
+            if ancestor.type == "interface_declaration":
+                # Interface fields are implicitly public static final.
+                return False
+            ancestor = ancestor.parent
+        return True
+    return parent.type == "assignment_expression" and parent.child_by_field_name("right") == node
+
+
+def _prepare_java_file(
+    path: Path, relative: str, rules: list[dict[str, Any]], findings: list[Any]
+) -> tuple[str | None, int, bool, bytes]:
+    original = path.read_bytes()
+    if len(original) > 1_000_000:
+        raise ValueError(f"cannot safely transform {relative}: source exceeds the 1 MB parser limit")
+    try:
+        original.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValueError(f"cannot safely transform {relative}: source is not UTF-8") from exc
+    parser = _tree_sitter_parser(path)
+    tree = parser.parse(original)
+    if tree is None or tree.root_node.has_error:
+        raise ValueError(f"cannot safely transform {relative}: invalid or unsupported Java syntax")
+
+    rule_by_id = {rule["id"]: rule for rule in rules}
+    by_location = {(finding.line, finding.column): finding for finding in findings}
+    starts = [0]
+    starts.extend(index + 1 for index, byte in enumerate(original) if byte == 0x0A)
+    candidates: dict[tuple[int, int], Any] = {}
+    stack = [tree.root_node]
+    while stack:
+        node = stack.pop()
+        if node.type == "string_literal" and _is_java_runtime_initializer(node):
+            row = node.start_point.row
+            column = len(original[starts[row]:node.start_byte + 1].decode("utf-8")) + 1
+            candidates[(row + 1, column)] = node
+        stack.extend(node.children)
+
+    edits: list[tuple[int, int, bytes]] = []
+    for location, finding in by_location.items():
+        node = candidates.get(location)
+        if node is None:
+            continue
+        rule = rule_by_id[finding.rule_id]
+        token = _tree_text(original, node)
+        literal = rule["literal"]
+        if len(token) < 2 or token[:1] != b'"' or token[-1:] != b'"':
+            continue
+        if token[1:-1] != literal or b"\\" in token:
+            continue
+        slot_literal = json.dumps(rule["slot"], ensure_ascii=True)
+        message_literal = json.dumps(rule["slot"] + " must be set", ensure_ascii=True)
+        replacement = (
+            f"java.util.Objects.requireNonNull(System.getenv({slot_literal}), {message_literal})"
+        ).encode("ascii")
+        edits.append((node.start_byte, node.end_byte, replacement))
+
+    if not edits:
+        return None, 0, bool(findings), original
+    rewritten = original
+    for start, end, replacement in sorted(edits, reverse=True):
+        rewritten = rewritten[:start] + replacement + rewritten[end:]
+    checked = parser.parse(rewritten)
+    if checked is None or checked.root_node.has_error:
+        raise ValueError(f"cannot safely transform {relative}: generated Java syntax is invalid")
+    return rewritten.decode("utf-8"), len(edits), len(edits) != len(by_location), original
+
+
 def apply_dynamic_resolutions(
     root: str | Path,
     policy: str | Path = ".udct-policy.json",
@@ -310,7 +508,7 @@ def apply_dynamic_resolutions(
     write: bool = False,
     confirm: str | None = None,
 ) -> ApplyReport:
-    """Prepare or explicitly write exact policy-backed Python and JS/TS rewrites.
+    """Prepare or explicitly write exact policy-backed Python, JS/TS, Go and Java rewrites.
 
     The default is a value-free preview. Writes are limited to a local Git root,
     supported source files with exact syntax-backed matches, and clean targets.
@@ -343,6 +541,14 @@ def apply_dynamic_resolutions(
             content, count, has_unresolved, original_bytes = _prepare_file(path, relative, rules, file_findings)
         elif suffix in {".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx"}:
             content, count, has_unresolved, original_bytes = _prepare_js_ts_file(
+                path, relative, rules, file_findings
+            )
+        elif suffix == ".go":
+            content, count, has_unresolved, original_bytes = _prepare_go_file(
+                path, relative, rules, file_findings
+            )
+        elif suffix == ".java":
+            content, count, has_unresolved, original_bytes = _prepare_java_file(
                 path, relative, rules, file_findings
             )
         else:
