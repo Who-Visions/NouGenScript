@@ -131,6 +131,8 @@ from nougenscript.morph import (
     UniversalMorphEngine,
 )
 from nougenscript.dynamic_guard import DynamicFinding, audit_dynamic_literals
+from nougenscript.sources import audit_dynamic_source
+from nougenscript.dynamic_suggestions import DynamicSuggestion, suggest_dynamic_literals
 
 __version__ = "0.9.0"
 __all__ = [
@@ -262,6 +264,9 @@ __all__ = [
     "UniversalStateConfig",
     "DynamicFinding",
     "audit_dynamic_literals",
+    "audit_dynamic_source",
+    "DynamicSuggestion",
+    "suggest_dynamic_literals",
 ]
 
 from nougenscript.udct import (

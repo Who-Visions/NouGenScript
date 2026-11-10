@@ -166,11 +166,38 @@ status 1 on a finding. It never rewrites source files.
 }
 ```
 
-Run `nougenscript audit-dynamic . --json` in CI. Findings identify the UDCT
-slot to use (for example, `{{API_BASE_URL}}`); a reviewer makes the source
-change explicitly and chooses the correct target-language configuration and
-escaping. Empty policies are valid. This is a policy-driven guard, not a
-heuristic ban on constants, a credentials scanner, or an automatic rewriter.
+Point the command at a local checkout or GitHub repository. Remote repositories
+are shallow-cloned to a temporary directory, scanned as data, and removed when
+the command exits; no remote branch is changed. An explicit policy may live
+outside the target repository, which lets a user audit public source without
+adding configuration to it. Private GitHub access uses `GITHUB_TOKEN` from the
+process environment and never writes it to the checkout.
+
+```bash
+nougenscript audit-dynamic . --json
+nougenscript audit-dynamic https://github.com/OWNER/REPOSITORY \
+  --ref main --policy ./review-policy.json --json
+```
+
+Findings identify the UDCT slot to use (for example, `{{API_BASE_URL}}`); a
+reviewer makes the source change explicitly and chooses the correct
+target-language configuration and escaping. Empty policies are valid. This is
+a policy-driven guard, not a heuristic ban on constants, a credentials
+scanner, or an automatic rewriter.
+
+For an initial read-only inventory without a policy, use `suggest-dynamic`.
+It looks for assignment-shaped service URLs, absolute paths, and operational
+limits, then reports likely environment-variable names and language-specific
+expressions where UDCT has a safe standard. It redacts URL credentials,
+queries, and paths from previews, ignores secret-named symbols and `.env`
+files, and does not edit source. Treat heuristic findings as review candidates;
+the owning project decides defaults, validation, and configuration semantics.
+
+```bash
+nougenscript suggest-dynamic ./service --json
+nougenscript suggest-dynamic https://github.com/OWNER/REPOSITORY --ref main
+nougenscript suggest-dynamic ./service --env-template > .env.example
+```
 
 ---
 

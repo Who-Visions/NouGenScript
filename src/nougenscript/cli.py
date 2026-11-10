@@ -179,20 +179,31 @@ def main(argv: list[str] | None = None) -> int:
     # 15. UDCT repository guard: policy-driven and read-only.
     p_guard = sub.add_parser(
         "audit-dynamic",
-        help="Find policy-declared hardcoded values in tracked Git files; read-only.",
+        help="Find policy-declared hardcoded values in a local or GitHub repository; read-only.",
     )
-    p_guard.add_argument("repo", type=Path, help="Git repository root to inspect")
+    p_guard.add_argument("source", help="Local Git checkout or https://github.com/OWNER/REPOSITORY")
     p_guard.add_argument("--policy", type=Path, default=Path(".udct-policy.json"),
-                         help="Repository-relative JSON policy (default: .udct-policy.json)")
+                         help="JSON policy path (local sources default to their .udct-policy.json)")
+    p_guard.add_argument("--ref", help="GitHub branch or tag to inspect; defaults to the repository default branch")
     p_guard.add_argument("--json", action="store_true", help="Output deterministic JSON findings")
+
+    p_suggest = sub.add_parser(
+        "suggest-dynamic",
+        help="Suggest environment-backed resolutions for likely deployment-specific literals; read-only.",
+    )
+    p_suggest.add_argument("source", help="Local directory or https://github.com/OWNER/REPOSITORY")
+    p_suggest.add_argument("--ref", help="GitHub branch or tag to inspect")
+    suggest_output = p_suggest.add_mutually_exclusive_group()
+    suggest_output.add_argument("--json", action="store_true", help="Output deterministic JSON suggestions")
+    suggest_output.add_argument("--env-template", action="store_true", help="Output a value-free .env template")
 
     args = parser.parse_args(argv)
 
     if args.command == "audit-dynamic":
-        from nougenscript.dynamic_guard import audit_dynamic_literals
+        from nougenscript.sources import audit_dynamic_source
 
         try:
-            findings = audit_dynamic_literals(args.repo, args.policy)
+            findings = audit_dynamic_source(args.source, args.policy, args.ref)
         except (OSError, ValueError) as exc:
             print(f"audit-dynamic: {exc}", file=sys.stderr)
             return 2
@@ -204,6 +215,28 @@ def main(argv: list[str] | None = None) -> int:
         else:
             print("No policy-declared hardcoded values found in tracked files.")
         return 1 if findings else 0
+
+    if args.command == "suggest-dynamic":
+        from nougenscript.dynamic_suggestions import render_environment_template, suggest_dynamic_literals
+
+        try:
+            suggestions = suggest_dynamic_literals(args.source, args.ref)
+        except (OSError, ValueError) as exc:
+            print(f"suggest-dynamic: {exc}", file=sys.stderr)
+            return 2
+        if args.env_template:
+            print(render_environment_template(suggestions), end="")
+        elif args.json:
+            print(json.dumps([item.to_dict() for item in suggestions], sort_keys=True, indent=2))
+        elif suggestions:
+            for item in suggestions:
+                resolution = item.resolution or "no safe standard expression for this file type"
+                import_hint = f" (add {item.required_import})" if item.required_import else ""
+                print(f"{item.path}:{item.line}:{item.column}: {item.symbol} -> {item.slot}: {resolution}{import_hint}")
+            print("Suggestions are advisory; review configuration semantics before editing source.")
+        else:
+            print("No likely deployment-specific assignments found.")
+        return 0
 
     if args.command == "parse":
         text = args.file.read_text(encoding="utf-8")
