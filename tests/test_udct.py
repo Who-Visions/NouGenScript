@@ -147,3 +147,66 @@ def test_udct_universality_across_domains():
     mid = audio_states[99]
     assert abs(mid.position_x) < 0.05
     assert abs(mid.intensity - 1.0) < 0.05
+
+
+def test_state_hash_covers_full_configuration():
+    base = UniversalStateConfig(duration=1, fps=2, start_pos=(0, 0, 0), end_pos=(1, 2, 3))
+    changed = UniversalStateConfig(duration=1, fps=2, action="turn", start_pos=(0, 0, 0), end_pos=(1, 2, 3))
+    base_states = UniversalDeterministicEngine.calculate_trajectory(base)
+    changed_states = UniversalDeterministicEngine.calculate_trajectory(changed)
+    assert base_states[0].state_hash != changed_states[0].state_hash
+    assert base_states[0].state_hash == UniversalDeterministicEngine.calculate_trajectory(base)[0].state_hash
+    configured_camera = UniversalStateConfig(
+        duration=1,
+        fps=2,
+        end_pos=(1, 2, 3),
+        camera_distance=7.0,
+        intensity_cycles=2.0,
+    )
+    configured_state = UniversalDeterministicEngine.calculate_trajectory(configured_camera)[0]
+    assert configured_state.state_hash != base_states[0].state_hash
+    assert configured_state.camera["z"] != base_states[0].camera["z"]
+
+
+def test_custom_dynamic_slots_render_deterministically_and_once():
+    cfg = UniversalStateConfig(
+        duration=1,
+        fps=1,
+        custom_constants={"domain": "{{subject}}", "weights": {"b": 2, "a": 1}},
+    )
+    state = UniversalDeterministicEngine.calculate_trajectory(cfg)[0]
+    rendered = UniversalDeterministicEngine.render_template(
+        "{{domain}} {{weights}} {{subject}} {{note}}",
+        state,
+        cfg,
+        {"note": "{{action}}"},
+    )
+    assert rendered == '{{subject}} {"a":1,"b":2} Subject {{action}}'
+    assert UniversalDeterministicEngine.compile_full_sequence("{{domain}}", cfg) == ["{{subject}}"]
+
+
+def test_template_rejects_unknown_or_reserved_slots():
+    cfg = UniversalStateConfig(duration=1, fps=1)
+    state = UniversalDeterministicEngine.calculate_trajectory(cfg)[0]
+    with pytest.raises(ValueError, match="unknown slots"):
+        UniversalDeterministicEngine.render_template("{{typo}}", state, cfg)
+    with pytest.raises(ValueError, match="reserved slot"):
+        UniversalDeterministicEngine.render_template("{{subject}}", state, cfg, {"subject": "replacement"})
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"duration": 0},
+        {"duration": float("nan")},
+        {"fps": 0},
+        {"start_pos": (0, 1), "end_pos": (1, 2, 3)},
+        {"intensity_range": (2, 1)},
+        {"intensity_cycles": -1},
+        {"camera_distance": -1},
+        {"camera_pitch_range": (float("nan"), 1)},
+    ],
+)
+def test_invalid_configuration_is_rejected(kwargs):
+    with pytest.raises(ValueError):
+        UniversalStateConfig(**kwargs)

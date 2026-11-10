@@ -32,9 +32,27 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import re
 from dataclasses import asdict, dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Sequence, Union
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Union
+
+
+_SLOT_PATTERN = re.compile(r"{{\s*([A-Za-z_][A-Za-z0-9_]*)\s*}}")
+_RESERVED_SLOTS = frozenset({
+    "frame_index", "total_frames", "t", "eased_t", "subject", "action",
+    "calc_position_x", "calc_position_y", "calc_position_z", "velocity_x",
+    "velocity_y", "intensity", "phase", "calc_camera_yaw", "calc_camera_pitch",
+    "calc_camera_x", "calc_camera_y", "calc_camera_z", "state_hash",
+})
+
+
+def _canonical_json(value: Any) -> str:
+    """Serialize deterministic input data without relying on insertion order."""
+    try:
+        return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("UDCT values must be finite JSON-compatible data") from exc
 
 
 class EasingType(str, Enum):
@@ -155,7 +173,68 @@ class UniversalStateConfig:
     easing: EasingType = EasingType.EASE_IN_OUT_CUBIC
     camera_offset: float = 0.17
     intensity_range: Sequence[float] = (0.1, 1.0)
+    intensity_cycles: float = 1.0
+    camera_start_yaw: float = 0.0
+    camera_end_yaw: float = 360.0
+    camera_pitch_range: Sequence[float] = (-15.0, 25.0)
+    camera_distance: float = 5.0
     custom_constants: Dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if isinstance(self.fps, bool) or not isinstance(self.fps, int) or self.fps <= 0:
+            raise ValueError("fps must be a positive integer")
+        if not isinstance(self.duration, (int, float)) or isinstance(self.duration, bool):
+            raise ValueError("duration must be a finite positive number")
+        if not math.isfinite(self.duration) or self.duration <= 0:
+            raise ValueError("duration must be a finite positive number")
+        if len(self.start_pos) not in (2, 3) or len(self.end_pos) != len(self.start_pos):
+            raise ValueError("start_pos and end_pos must have the same length: 2 or 3")
+        for name, position in (("start_pos", self.start_pos), ("end_pos", self.end_pos)):
+            if any(isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value)
+                   for value in position):
+                raise ValueError(f"{name} values must be finite numbers")
+        if len(self.intensity_range) != 2 or any(
+            isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value)
+            for value in self.intensity_range
+        ):
+            raise ValueError("intensity_range must contain two finite numbers")
+        if self.intensity_range[0] > self.intensity_range[1]:
+            raise ValueError("intensity_range minimum must not exceed its maximum")
+        if len(self.camera_pitch_range) != 2 or any(
+            isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value)
+            for value in self.camera_pitch_range
+        ):
+            raise ValueError("camera_pitch_range must contain two finite numbers")
+        scalar_settings = {
+            "intensity_cycles": self.intensity_cycles,
+            "camera_start_yaw": self.camera_start_yaw,
+            "camera_end_yaw": self.camera_end_yaw,
+            "camera_distance": self.camera_distance,
+        }
+        for name, value in scalar_settings.items():
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+                raise ValueError(f"{name} must be a finite number")
+        if self.intensity_cycles < 0:
+            raise ValueError("intensity_cycles must be nonnegative")
+        if self.camera_distance < 0:
+            raise ValueError("camera_distance must be nonnegative")
+        if isinstance(self.camera_offset, bool) or not isinstance(self.camera_offset, (int, float)) \
+                or not math.isfinite(self.camera_offset):
+            raise ValueError("camera_offset must be a finite number")
+        try:
+            self.easing = EasingType(self.easing)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"unsupported easing value: {self.easing!r}") from exc
+        if not isinstance(self.subject, str) or not isinstance(self.action, str):
+            raise ValueError("subject and action must be strings")
+        if not isinstance(self.custom_constants, dict):
+            raise ValueError("custom_constants must be a mapping")
+        for key in self.custom_constants:
+            if not isinstance(key, str) or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", key):
+                raise ValueError("custom constant names must be valid identifiers")
+            if key in _RESERVED_SLOTS:
+                raise ValueError(f"custom constant cannot replace reserved slot {key!r}")
+        _canonical_json(self.custom_constants)
 
     @property
     def total_frames(self) -> int:
@@ -202,18 +281,56 @@ class UniversalDeterministicEngine:
 
             # Harmonic intensity
             i_min, i_max = config.intensity_range[0], config.intensity_range[1]
-            intensity = MathFunctions.harmonic_intensity(t, i_min=i_min, i_max=i_max, cycles=1.0)
+            intensity = MathFunctions.harmonic_intensity(
+                t, i_min=i_min, i_max=i_max, cycles=config.intensity_cycles
+            )
 
             # Phase angle in radians
             phase = (t * 2.0 * math.pi + config.camera_offset) % (2.0 * math.pi)
 
             # Camera orbit
             cam_t = (t + config.camera_offset) % 1.0
-            cam = MathFunctions.orbit_camera(cam_t, start_yaw=0.0, end_yaw=360.0)
+            cam = MathFunctions.orbit_camera(
+                cam_t,
+                start_yaw=config.camera_start_yaw,
+                end_yaw=config.camera_end_yaw,
+                pitch_min=config.camera_pitch_range[0],
+                pitch_max=config.camera_pitch_range[1],
+                distance=config.camera_distance,
+            )
 
-            # State hash invariant
-            raw_signature = f"{i}:{n}:{round(t, 6)}:{round(px, 4)}:{round(py, 4)}:{round(vx, 4)}:{round(intensity, 4)}"
-            state_hash = hashlib.sha256(raw_signature.encode("utf-8")).hexdigest()
+            # Bind the hash to the complete configuration and calculated state.
+            hash_payload = {
+                "config": {
+                    "duration": config.duration,
+                    "fps": config.fps,
+                    "subject": config.subject,
+                    "action": config.action,
+                    "start_pos": list(config.start_pos),
+                    "end_pos": list(config.end_pos),
+                    "easing": config.easing.value,
+                    "camera_offset": config.camera_offset,
+                    "intensity_range": list(config.intensity_range),
+                    "intensity_cycles": config.intensity_cycles,
+                    "camera_start_yaw": config.camera_start_yaw,
+                    "camera_end_yaw": config.camera_end_yaw,
+                    "camera_pitch_range": list(config.camera_pitch_range),
+                    "camera_distance": config.camera_distance,
+                    "custom_constants": config.custom_constants,
+                },
+                "state": {
+                    "index": i,
+                    "total_steps": n,
+                    "t": round(t, 6),
+                    "eased_t": round(et, 6),
+                    "position": [round(px, 4), round(py, 4), round(pz, 4)],
+                    "velocity": [round(vx, 4), round(vy, 4)],
+                    "intensity": round(intensity, 4),
+                    "phase_angle": round(phase, 4),
+                    "camera": cam,
+                },
+            }
+            state_hash = hashlib.sha256(_canonical_json(hash_payload).encode("utf-8")).hexdigest()
 
             states.append(
                 FrameCalculatedState(
@@ -241,41 +358,56 @@ class UniversalDeterministicEngine:
         template_str: str,
         state: FrameCalculatedState,
         config: UniversalStateConfig,
-        custom_slots: Optional[Dict[str, str]] = None,
+        custom_slots: Optional[Mapping[str, Any]] = None,
     ) -> str:
         """Renders template string by replacing slots with calculated math values.
         Supports {{slot}} syntax without third-party template dependencies.
         """
         replacements = {
-            "{{frame_index}}": str(state.index),
-            "{{total_frames}}": str(state.total_steps),
-            "{{t}}": f"{state.t:.4f}",
-            "{{eased_t}}": f"{state.eased_t:.4f}",
-            "{{subject}}": config.subject,
-            "{{action}}": config.action,
-            "{{calc_position_x}}": f"{state.position_x:.4f}",
-            "{{calc_position_y}}": f"{state.position_y:.4f}",
-            "{{calc_position_z}}": f"{state.position_z:.4f}",
-            "{{velocity_x}}": f"{state.velocity_x:.4f}",
-            "{{velocity_y}}": f"{state.velocity_y:.4f}",
-            "{{intensity}}": f"{state.intensity:.4f}",
-            "{{phase}}": f"{state.phase_angle:.4f}",
-            "{{calc_camera_yaw}}": f"{state.camera['yaw']:.2f}",
-            "{{calc_camera_pitch}}": f"{state.camera['pitch']:.2f}",
-            "{{calc_camera_x}}": f"{state.camera['x']:.2f}",
-            "{{calc_camera_y}}": f"{state.camera['y']:.2f}",
-            "{{calc_camera_z}}": f"{state.camera['z']:.2f}",
-            "{{state_hash}}": state.state_hash,
+            "frame_index": str(state.index),
+            "total_frames": str(state.total_steps),
+            "t": f"{state.t:.4f}",
+            "eased_t": f"{state.eased_t:.4f}",
+            "subject": config.subject,
+            "action": config.action,
+            "calc_position_x": f"{state.position_x:.4f}",
+            "calc_position_y": f"{state.position_y:.4f}",
+            "calc_position_z": f"{state.position_z:.4f}",
+            "velocity_x": f"{state.velocity_x:.4f}",
+            "velocity_y": f"{state.velocity_y:.4f}",
+            "intensity": f"{state.intensity:.4f}",
+            "phase": f"{state.phase_angle:.4f}",
+            "calc_camera_yaw": f"{state.camera['yaw']:.2f}",
+            "calc_camera_pitch": f"{state.camera['pitch']:.2f}",
+            "calc_camera_x": f"{state.camera['x']:.2f}",
+            "calc_camera_y": f"{state.camera['y']:.2f}",
+            "calc_camera_z": f"{state.camera['z']:.2f}",
+            "state_hash": state.state_hash,
         }
 
+        custom = dict(config.custom_constants)
         if custom_slots:
-            for k, v in custom_slots.items():
-                replacements[f"{{{{{k}}}}}"] = str(v)
+            for key, value in custom_slots.items():
+                if not isinstance(key, str) or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", key):
+                    raise ValueError("custom slot names must be valid identifiers")
+                if key in _RESERVED_SLOTS:
+                    raise ValueError(f"custom slot cannot replace reserved slot {key!r}")
+                if key in custom:
+                    raise ValueError(f"custom slot {key!r} is already defined in custom_constants")
+                custom[key] = value
 
-        rendered = template_str
-        for k, v in replacements.items():
-            rendered = rendered.replace(k, v)
-        return rendered
+        for key, value in custom.items():
+            replacements[key] = value if isinstance(value, str) else _canonical_json(value)
+
+        found = {match.group(1) for match in _SLOT_PATTERN.finditer(template_str)}
+        malformed = _SLOT_PATTERN.sub("", template_str)
+        if "{{" in malformed or "}}" in malformed:
+            raise ValueError("template contains malformed slot syntax")
+        unknown = found.difference(replacements)
+        if unknown:
+            raise ValueError(f"template contains unknown slots: {', '.join(sorted(unknown))}")
+
+        return _SLOT_PATTERN.sub(lambda match: str(replacements[match.group(1)]), template_str)
 
     @classmethod
     def compile_full_sequence(
@@ -283,6 +415,7 @@ class UniversalDeterministicEngine:
         template_str: str,
         config: UniversalStateConfig,
         sample_indices: Optional[Sequence[int]] = None,
+        custom_slots: Optional[Mapping[str, Any]] = None,
     ) -> List[str]:
         """Calculates trajectory and renders full or sampled sequence deterministically."""
         states = cls.calculate_trajectory(config)
@@ -290,5 +423,5 @@ class UniversalDeterministicEngine:
         rendered_outputs = []
         for idx in indices:
             if 0 <= idx < len(states):
-                rendered_outputs.append(cls.render_template(template_str, states[idx], config))
+                rendered_outputs.append(cls.render_template(template_str, states[idx], config, custom_slots))
         return rendered_outputs
