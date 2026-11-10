@@ -6,6 +6,7 @@ import pytest
 
 from nougenscript.cli import main
 from nougenscript.dynamic_guard import audit_dynamic_literals
+from nougenscript.sources import _github_repository_url, audit_dynamic_source
 
 
 def _git_repo(path: Path) -> Path:
@@ -82,12 +83,11 @@ def test_policy_rejects_unknown_fields(tmp_path):
         audit_dynamic_literals(root)
 
 
-def test_policy_must_be_inside_repository(tmp_path):
+def test_policy_can_live_outside_repository(tmp_path):
     root = _git_repo(tmp_path / "repo")
     outside = tmp_path / "outside.json"
     outside.write_text('{"version":1,"rules":[]}', encoding="utf-8")
-    with pytest.raises(ValueError, match="inside the repository"):
-        audit_dynamic_literals(root, outside)
+    assert audit_dynamic_literals(root, outside) == []
 
 
 def test_policy_file_is_excluded_even_for_broad_globs(tmp_path):
@@ -96,6 +96,30 @@ def test_policy_file_is_excluded_even_for_broad_globs(tmp_path):
                                  "slot": "POLICY_MARKER", "rationale": "The marker is dynamic."}])
     subprocess.run(["git", "-C", str(root), "add", policy.name], check=True)
     assert audit_dynamic_literals(root) == []
+
+
+def test_source_api_accepts_a_local_checkout(tmp_path):
+    root = _git_repo(tmp_path / "repo")
+    source = root / "config.py"
+    source.write_text('API_URL = "https://api.example.invalid"\n', encoding="utf-8")
+    subprocess.run(["git", "-C", str(root), "add", "config.py"], check=True)
+    _write_policy(root, [{"id": "api", "literal": "https://api.example.invalid", "paths": ["*.py"],
+                         "slot": "API_URL", "rationale": "Set by deployment."}])
+    assert audit_dynamic_source(root)[0].slot == "API_URL"
+
+
+def test_github_source_parser_rejects_non_github_or_ambiguous_urls():
+    assert _github_repository_url("https://github.com/owner/repo") == "https://github.com/owner/repo.git"
+    assert _github_repository_url("https://github.com/owner/repo.git") == "https://github.com/owner/repo.git"
+    for source in (
+        "http://github.com/owner/repo",
+        "https://evil.example/owner/repo",
+        "https://user:secret@github.com/owner/repo",
+        "https://github.com/owner/repo/tree/main",
+        "https://github.com/owner/repo?download=1",
+    ):
+        with pytest.raises(ValueError):
+            _github_repository_url(source)
 
 
 def test_audit_requires_repository_root(tmp_path):

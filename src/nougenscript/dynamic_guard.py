@@ -13,8 +13,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-
 _SLOT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+_MAX_TRACKED_FILES = 10_000
+_MAX_FILE_BYTES = 1_000_000
+_MAX_TOTAL_BYTES = 100_000_000
 
 
 @dataclass(frozen=True)
@@ -110,14 +112,16 @@ def audit_dynamic_literals(root: str | Path, policy: str | Path = ".udct-policy.
     if not policy_path.is_absolute():
         policy_path = repo / policy_path
     policy_path = policy_path.resolve(strict=True)
-    if not policy_path.is_relative_to(repo):
-        raise ValueError("policy path must be inside the repository")
-    policy_relative = policy_path.relative_to(repo).as_posix()
+    policy_relative = policy_path.relative_to(repo).as_posix() if policy_path.is_relative_to(repo) else None
     rules = _load_policy(policy_path)
     findings: list[DynamicFinding] = []
 
-    for relative in _tracked_files(repo):
-        if relative == policy_relative:
+    tracked_files = _tracked_files(repo)
+    if len(tracked_files) > _MAX_TRACKED_FILES:
+        raise ValueError("repository contains more than 10,000 tracked files; narrow the audit scope")
+    total_bytes = 0
+    for relative in tracked_files:
+        if policy_relative is not None and relative == policy_relative:
             continue
         applicable_rules = [rule for rule in rules
                             if any(_matches_path(relative, pattern) for pattern in rule["paths"])]
@@ -129,7 +133,15 @@ def audit_dynamic_literals(root: str | Path, policy: str | Path = ".udct-policy.
         if not candidate.is_file():
             continue
         try:
+            size = candidate.stat().st_size
+            if size > _MAX_FILE_BYTES:
+                continue
+            total_bytes += size
+            if total_bytes > _MAX_TOTAL_BYTES:
+                raise ValueError("repository exceeds the 100 MB policy scan limit; narrow the audit scope")
             content = candidate.read_bytes()
+        except ValueError:
+            raise
         except OSError as exc:
             raise ValueError(f"cannot read tracked file {relative}: {exc}") from exc
         if b"\0" in content:
