@@ -133,6 +133,7 @@ from nougenscript.morph import (
 from nougenscript.dynamic_guard import DynamicFinding, audit_dynamic_literals
 from nougenscript.sources import audit_dynamic_source
 from nougenscript.dynamic_suggestions import DynamicSuggestion, suggest_dynamic_literals
+from nougenscript.dynamic_apply import ApplyReport, apply_dynamic_resolutions
 from nougenscript.resolution_plan import ResolutionPlan, plan_dynamic_resolutions
 
 __version__ = "0.9.0"
@@ -270,6 +271,8 @@ __all__ = [
     "suggest_dynamic_literals",
     "ResolutionPlan",
     "plan_dynamic_resolutions",
+    "ApplyReport",
+    "apply_dynamic_resolutions",
 ]
 
 from nougenscript.udct import (
