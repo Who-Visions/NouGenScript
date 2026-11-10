@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -206,6 +207,16 @@ def main(argv: list[str] | None = None) -> int:
     p_plan.add_argument("--ref", help="GitHub branch or tag to inspect")
     p_plan.add_argument("--json", action="store_true", help="Output deterministic JSON plans")
 
+    p_apply = sub.add_parser(
+        "apply-dynamic",
+        help="Prepare exact policy-backed Python resolutions; --write explicitly edits clean local files.",
+    )
+    p_apply.add_argument("source", help="Local Git repository (remote URLs are read-only)")
+    p_apply.add_argument("--policy", type=Path, default=Path(".udct-policy.json"), help="JSON policy path")
+    p_apply.add_argument("--write", action="store_true", help="Write a previewed plan when paired with its --confirm ID")
+    p_apply.add_argument("--confirm", help="Plan ID printed by a fresh preview; binds approval to exact source contents")
+    p_apply.add_argument("--json", action="store_true", help="Output a value-free application report")
+
     args = parser.parse_args(argv)
 
     if args.command == "audit-dynamic":
@@ -265,6 +276,26 @@ def main(argv: list[str] | None = None) -> int:
             print("Plans are advisory; review every occurrence before applying a source change.")
         else:
             print("No policy-declared hardcoded values found in tracked files.")
+        return 0
+
+    if args.command == "apply-dynamic":
+        from nougenscript.dynamic_apply import apply_dynamic_resolutions
+
+        try:
+            report = apply_dynamic_resolutions(args.source, args.policy, write=args.write, confirm=args.confirm)
+        except (OSError, SyntaxError, ValueError, subprocess.SubprocessError) as exc:
+            print(f"apply-dynamic: {exc}", file=sys.stderr)
+            return 2
+        if args.json:
+            print(json.dumps(report.to_dict(), sort_keys=True, indent=2))
+        else:
+            action = "Updated" if report.written else "Prepared (no files changed)"
+            print(f"{action}: {report.replacements} exact Python literal(s) in {len(report.changed_files)} file(s).")
+            if report.changed_files:
+                print("Files: " + ", ".join(report.changed_files))
+            if report.unresolved:
+                print("Manual review required: " + ", ".join(report.unresolved))
+            print("Review the resulting code and provide the required environment variables before running it.")
         return 0
 
     if args.command == "parse":

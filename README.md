@@ -195,6 +195,25 @@ non-code context. It never edits the repository.
 nougenscript plan-dynamic . --json
 ```
 
+For local Python repositories, `apply-dynamic` adds a conservative adapter for
+exact standalone string literals covered by the policy. It skips comments,
+docstrings, annotations, unsupported languages, and contexts it cannot safely
+map; the repository is never executed. Without `--write`, it prints a
+value-free preview and a plan ID bound to hashes of the exact source/result
+files. Review `plan-dynamic` and the preview, then pass that ID with `--write`.
+Writes change only clean `.py` targets and validate resulting syntax. Supply
+the named environment variables before running the application. GitHub URLs
+remain read-only: clone the repository locally before applying a change.
+
+```bash
+nougenscript apply-dynamic ./service --json
+nougenscript apply-dynamic ./service --write --confirm PLAN_ID --json
+```
+
+Automatic application is currently Python-only. Other languages receive
+reviewable resolution plans, but are not rewritten until UDCT has a
+language-aware adapter and syntax validation for them.
+
 For an initial read-only inventory without a policy, use `suggest-dynamic`.
 It looks for assignment-shaped service URLs, absolute paths, and operational
 limits, then reports likely environment-variable names and language-specific
