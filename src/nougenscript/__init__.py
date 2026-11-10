@@ -89,10 +89,6 @@ from nougenscript.templates import (
     generate_thirty_act_scaffold,
     generate_unity_outline,
     generate_youtube_longform_template,
-    UDCTCalculationResult,
-    UDCTFrameState,
-    UDCTInputState,
-    UniversalDeterministicCalculatedTemplate,
 )
 from nougenscript.validators import (
     AristotleUnitiesValidator,
@@ -134,6 +130,7 @@ from nougenscript.morph import (
     UniversalCalculatedTemplate,
     UniversalMorphEngine,
 )
+from nougenscript.dynamic_guard import DynamicFinding, audit_dynamic_literals
 
 __version__ = "0.9.0"
 __all__ = [
@@ -263,6 +260,8 @@ __all__ = [
     "MathFunctions",
     "UniversalDeterministicEngine",
     "UniversalStateConfig",
+    "DynamicFinding",
+    "audit_dynamic_literals",
 ]
 
 from nougenscript.udct import (
