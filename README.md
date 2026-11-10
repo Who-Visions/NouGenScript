@@ -185,6 +185,16 @@ target-language configuration and escaping. Empty policies are valid. This is
 a policy-driven guard, not a heuristic ban on constants, a credentials
 scanner, or an automatic rewriter.
 
+To turn those exact policy matches into a deterministic, value-free plan, use
+`plan-dynamic`. It includes each location, slot, candidate expression, and any
+required import. Unknown file types are marked for manual resolution, and every
+plan entry requires review because a literal match may occur in a comment or a
+non-code context. It never edits the repository.
+
+```bash
+nougenscript plan-dynamic . --json
+```
+
 For an initial read-only inventory without a policy, use `suggest-dynamic`.
 It looks for assignment-shaped service URLs, absolute paths, and operational
 limits, then reports likely environment-variable names and language-specific

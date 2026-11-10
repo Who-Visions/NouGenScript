@@ -98,7 +98,7 @@ def _tracked_or_source_files(root: Path) -> list[str]:
     return sorted(entries)
 
 
-def _resolution(path: str, slot: str) -> tuple[str, str | None]:
+def resolution_for_path(path: str, slot: str) -> tuple[str | None, str | None]:
     suffix = Path(path).suffix.lower()
     if suffix in {".py", ".pyi"}:
         return f'os.environ["{slot}"]', "import os"
@@ -192,7 +192,7 @@ def suggest_dynamic_literals(source: str | Path, ref: str | None = None) -> list
                 slot = re.sub(r"[^A-Z0-9_]+", "_", slot).strip("_")
                 if not slot or not slot[0].isalpha():
                     continue
-                resolution, required_import = _resolution(relative, slot)
+                resolution, required_import = resolution_for_path(relative, slot)
                 column = match.start("string") + 1 if string_value is not None else match.start("number") + 1
                 fingerprint = hashlib.sha256(f"{relative}\0{line_number}\0{symbol}".encode()).hexdigest()[:12]
                 rationale = {
