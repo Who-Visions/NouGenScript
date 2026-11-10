@@ -197,6 +197,15 @@ def main(argv: list[str] | None = None) -> int:
     suggest_output.add_argument("--json", action="store_true", help="Output deterministic JSON suggestions")
     suggest_output.add_argument("--env-template", action="store_true", help="Output a value-free .env template")
 
+    p_plan = sub.add_parser(
+        "plan-dynamic",
+        help="Map policy-backed findings to reviewable language expressions without editing source.",
+    )
+    p_plan.add_argument("source", help="Local Git checkout or https://github.com/OWNER/REPOSITORY")
+    p_plan.add_argument("--policy", type=Path, default=Path(".udct-policy.json"), help="JSON policy path")
+    p_plan.add_argument("--ref", help="GitHub branch or tag to inspect")
+    p_plan.add_argument("--json", action="store_true", help="Output deterministic JSON plans")
+
     args = parser.parse_args(argv)
 
     if args.command == "audit-dynamic":
@@ -236,6 +245,26 @@ def main(argv: list[str] | None = None) -> int:
             print("Suggestions are advisory; review configuration semantics before editing source.")
         else:
             print("No likely deployment-specific assignments found.")
+        return 0
+
+    if args.command == "plan-dynamic":
+        from nougenscript.resolution_plan import plan_dynamic_resolutions
+
+        try:
+            plans = plan_dynamic_resolutions(args.source, args.policy, args.ref)
+        except (OSError, ValueError) as exc:
+            print(f"plan-dynamic: {exc}", file=sys.stderr)
+            return 2
+        if args.json:
+            print(json.dumps([item.to_dict() for item in plans], sort_keys=True, indent=2))
+        elif plans:
+            for item in plans:
+                expression = item.resolution or "manual resolution required for this file type"
+                import_hint = f" (add {item.required_import})" if item.required_import else ""
+                print(f"{item.path}:{item.line}:{item.column}: {{{{{item.slot}}}}} -> {expression}{import_hint}")
+            print("Plans are advisory; review every occurrence before applying a source change.")
+        else:
+            print("No policy-declared hardcoded values found in tracked files.")
         return 0
 
     if args.command == "parse":
