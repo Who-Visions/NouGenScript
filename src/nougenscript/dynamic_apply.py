@@ -222,6 +222,53 @@ def _parse_js_ts(parser: Any, source: bytes) -> Any:
     return parser.parse(source)
 
 
+def _js_binding_contains(node: Any, name: str) -> bool:
+    """Return whether a JavaScript binding pattern declares ``name``."""
+    if node.type in {"identifier", "shorthand_property_identifier_pattern"}:
+        return node.text.decode("utf-8") == name
+    if node.type == "pair_pattern":
+        value = node.child_by_field_name("value")
+        return value is not None and _js_binding_contains(value, name)
+    if node.type == "assignment_pattern":
+        left = node.child_by_field_name("left")
+        return left is not None and _js_binding_contains(left, name)
+    if node.type == "type_annotation":
+        return False
+    return any(_js_binding_contains(child, name) for child in node.named_children)
+
+
+def _js_declares_binding(root: Any, name: str) -> bool:
+    """Conservatively detect file-local bindings that can capture globals.
+
+    A file-wide check intentionally prefers leaving a candidate unresolved over
+    emitting ``process.env`` that binds to a local parameter or declaration.
+    """
+    declaration_fields = {
+        "variable_declarator": ("name",),
+        "function_declaration": ("name", "parameters"),
+        "function_expression": ("name", "parameters"),
+        "generator_function_declaration": ("name", "parameters"),
+        "generator_function": ("name", "parameters"),
+        "class_declaration": ("name",),
+        "class": ("name",),
+        "method_definition": ("parameters",),
+        "arrow_function": ("parameters",),
+        "catch_clause": ("parameter",),
+        "import_specifier": ("alias",),
+        "import_clause": ("*",),
+        "namespace_import": ("name",),
+    }
+    stack = [root]
+    while stack:
+        node = stack.pop()
+        for field in declaration_fields.get(node.type, ()):
+            bindings = node.named_children if field == "*" else (node.child_by_field_name(field),)
+            if any(binding is not None and _js_binding_contains(binding, name) for binding in bindings):
+                return True
+        stack.extend(node.children)
+    return False
+
+
 def _is_js_initializer(node: Any) -> bool:
     """Limit JS/TS writes to direct variable, object-property, and assignment values."""
     parent = node.parent
@@ -257,6 +304,9 @@ def _prepare_js_ts_file(
         raise ValueError(f"cannot safely transform {relative}: parser could not produce a syntax tree")
     if tree.root_node.has_error:
         raise ValueError(f"cannot safely transform {relative}: invalid or unsupported JavaScript/TypeScript syntax")
+
+    if _js_declares_binding(tree.root_node, "process"):
+        return None, 0, bool(findings), original_bytes
 
     rule_by_id = {rule["id"]: rule for rule in rules}
     by_location: dict[tuple[int, int], Any] = {}
@@ -354,20 +404,18 @@ def _go_declares_identifier(root: Any, source: bytes, name: str) -> bool:
     """
     declaration_types = {
         "const_spec", "function_declaration", "parameter_declaration",
-        "type_spec", "var_spec",
+        "variadic_parameter_declaration", "type_spec", "var_spec",
     }
     stack = [root]
     while stack:
         node = stack.pop()
         if node.type in declaration_types:
-            declared = node.child_by_field_name("name")
-            if declared is not None:
-                names = [declared]
-                while names:
-                    candidate = names.pop()
-                    if candidate.type == "identifier" and _tree_text(source, candidate).decode("utf-8") == name:
-                        return True
-                    names.extend(candidate.children)
+            names = list(node.children_by_field_name("name"))
+            while names:
+                candidate = names.pop()
+                if candidate.type == "identifier" and _tree_text(source, candidate).decode("utf-8") == name:
+                    return True
+                names.extend(candidate.children)
         elif node.type == "short_var_declaration":
             left = node.child_by_field_name("left")
             if left is not None:
@@ -521,6 +569,25 @@ def _is_java_runtime_initializer(node: Any) -> bool:
     return parent.type == "assignment_expression" and parent.child_by_field_name("right") == node
 
 
+def _java_declares_identifier(root: Any, source: bytes, name: str) -> bool:
+    """Conservatively avoid generated fully-qualified names captured by locals."""
+    declaration_types = {
+        "formal_parameter", "spread_parameter", "variable_declarator",
+        "catch_formal_parameter", "resource", "enhanced_for_statement",
+        "class_declaration", "interface_declaration", "enum_declaration",
+        "record_declaration", "annotation_type_declaration",
+    }
+    stack = [root]
+    while stack:
+        node = stack.pop()
+        if node.type in declaration_types:
+            declared = node.child_by_field_name("name")
+            if declared is not None and _tree_text(source, declared).decode("utf-8") == name:
+                return True
+        stack.extend(node.children)
+    return False
+
+
 def _prepare_java_file(
     path: Path, relative: str, rules: list[dict[str, Any]], findings: list[Any]
 ) -> tuple[str | None, int, bool, bytes]:
@@ -535,6 +602,9 @@ def _prepare_java_file(
     tree = parser.parse(original)
     if tree is None or tree.root_node.has_error:
         raise ValueError(f"cannot safely transform {relative}: invalid or unsupported Java syntax")
+
+    if _java_declares_identifier(tree.root_node, original, "java"):
+        return None, 0, bool(findings), original
 
     rule_by_id = {rule["id"]: rule for rule in rules}
     by_location = {(finding.line, finding.column): finding for finding in findings}
@@ -565,7 +635,7 @@ def _prepare_java_file(
         slot_literal = json.dumps(rule["slot"], ensure_ascii=True)
         message_literal = json.dumps(rule["slot"] + " must be set", ensure_ascii=True)
         replacement = (
-            f"java.util.Objects.requireNonNull(System.getenv({slot_literal}), {message_literal})"
+            f"java.util.Objects.requireNonNull(java.lang.System.getenv({slot_literal}), {message_literal})"
         ).encode("ascii")
         edits.append((node.start_byte, node.end_byte, replacement))
 

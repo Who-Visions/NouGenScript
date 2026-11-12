@@ -113,3 +113,41 @@ def test_apply_js_leaves_escaped_and_noninitializer_occurrences_unresolved(tmp_p
     assert report.replacements == 0
     assert report.unresolved == ("client.js",)
     assert source.read_text(encoding="utf-8").count(LITERAL) == 1
+
+
+@pytest.mark.parametrize("binding", [
+    'function endpoint(process) { return process; }',
+    'const endpoint = (process) => process;',
+    'function endpoint({ process }) { return process; }',
+    "import process from 'runtime';",
+])
+def test_apply_js_leaves_file_unresolved_when_process_is_shadowed(tmp_path, binding):
+    root = _repo(tmp_path / "repo")
+    source = root / "client.js"
+    source.write_text(
+        f'{binding}\nconst endpointUrl = "{LITERAL}";\n', encoding="utf-8"
+    )
+    _commit(root, source)
+    _policy(root, "js")
+
+    report = apply_dynamic_resolutions(root)
+
+    assert report.replacements == 0
+    assert report.unresolved == ("client.js",)
+    assert LITERAL in source.read_text(encoding="utf-8")
+
+
+def test_apply_js_object_property_named_process_does_not_count_as_binding(tmp_path):
+    root = _repo(tmp_path / "repo")
+    source = root / "client.js"
+    source.write_text(
+        f'const config = {{ process: "local" }};\nconst endpoint = "{LITERAL}";\n',
+        encoding="utf-8",
+    )
+    _commit(root, source)
+    _policy(root, "js")
+
+    report = apply_dynamic_resolutions(root)
+
+    assert report.replacements == 1
+    assert report.unresolved == ()

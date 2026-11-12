@@ -138,6 +138,25 @@ def test_go_existing_import_shadow_is_left_unresolved(tmp_path):
     assert LITERAL in path.read_text(encoding="utf-8")
 
 
+@pytest.mark.parametrize("parameter", ["a, os string", "os ...string"])
+def test_go_existing_import_shadow_checks_all_and_variadic_parameter_names(tmp_path, parameter):
+    root = _repo(tmp_path / "repo")
+    path = root / "client.go"
+    path.write_text(
+        f'package main\nimport "os"\n'
+        f'func endpoint({parameter}) string {{ return "{LITERAL}" }}\n',
+        encoding="utf-8",
+    )
+    _commit(root, path)
+    _policy(root, "go")
+
+    report = apply_dynamic_resolutions(root)
+
+    assert report.replacements == 0
+    assert report.unresolved == ("client.go",)
+    assert LITERAL in path.read_text(encoding="utf-8")
+
+
 def test_java_rewrites_runtime_values_and_preserves_compile_time_constants(tmp_path):
     root = _repo(tmp_path / "repo")
     path = root / "Client.java"
@@ -156,7 +175,7 @@ def test_java_rewrites_runtime_values_and_preserves_compile_time_constants(tmp_p
 
     content = path.read_text(encoding="utf-8")
     assert report.written and report.replacements == 3
-    assert content.count('java.util.Objects.requireNonNull(System.getenv("API_BASE_URL"), "API_BASE_URL must be set")') == 3
+    assert content.count('java.util.Objects.requireNonNull(java.lang.System.getenv("API_BASE_URL"), "API_BASE_URL must be set")') == 3
     assert f'static final String CONSTANT = "{LITERAL}";' in content
     assert f'final String LOCAL = "{LITERAL}";' in content
     assert f'// {LITERAL}' in content
@@ -166,6 +185,46 @@ def test_java_rewrites_runtime_values_and_preserves_compile_time_constants(tmp_p
         [javac, "-version"], check=False, capture_output=True, text=True
     ).returncode == 0:
         subprocess.run(["javac", path.name], cwd=root, check=True, capture_output=True, text=True)
+
+
+def test_java_qualifies_system_when_parameter_shadows_type_name(tmp_path):
+    root = _repo(tmp_path / "repo")
+    path = root / "Client.java"
+    path.write_text(
+        f'class Client {{ void endpoint(String System) {{ String url = "{LITERAL}"; }} }}\n',
+        encoding="utf-8",
+    )
+    _commit(root, path)
+    _policy(root, "java")
+
+    preview = apply_dynamic_resolutions(root)
+    report = apply_dynamic_resolutions(root, write=True, confirm=preview.plan_id)
+
+    content = path.read_text(encoding="utf-8")
+    assert report.replacements == 1
+    assert "java.lang.System.getenv(\"API_BASE_URL\")" in content
+    javac = shutil.which("javac")
+    if javac and subprocess.run(
+        [javac, "-version"], check=False, capture_output=True, text=True
+    ).returncode == 0:
+        subprocess.run(["javac", path.name], cwd=root, check=True, capture_output=True, text=True)
+
+
+def test_java_leaves_resolution_unresolved_when_java_package_prefix_is_shadowed(tmp_path):
+    root = _repo(tmp_path / "repo")
+    path = root / "Client.java"
+    path.write_text(
+        f'class Client {{ void endpoint(String java) {{ String url = "{LITERAL}"; }} }}\n',
+        encoding="utf-8",
+    )
+    _commit(root, path)
+    _policy(root, "java")
+
+    report = apply_dynamic_resolutions(root)
+
+    assert report.replacements == 0
+    assert report.unresolved == ("Client.java",)
+    assert LITERAL in path.read_text(encoding="utf-8")
 
 
 def test_java_leaves_compile_time_constant_only_file_unresolved(tmp_path):
