@@ -575,7 +575,8 @@ def _java_declares_identifier(root: Any, source: bytes, name: str) -> bool:
         "formal_parameter", "spread_parameter", "variable_declarator",
         "catch_formal_parameter", "resource", "enhanced_for_statement",
         "class_declaration", "interface_declaration", "enum_declaration",
-        "record_declaration", "annotation_type_declaration",
+        "record_declaration", "record_component", "enum_constant",
+        "annotation_type_declaration",
     }
     stack = [root]
     while stack:

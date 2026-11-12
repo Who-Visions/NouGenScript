@@ -227,6 +227,23 @@ def test_java_leaves_resolution_unresolved_when_java_package_prefix_is_shadowed(
     assert LITERAL in path.read_text(encoding="utf-8")
 
 
+def test_java_record_component_does_not_capture_generated_package_prefix(tmp_path):
+    root = _repo(tmp_path / "repo")
+    path = root / "Client.java"
+    path.write_text(
+        f'record Client(String java) {{ void endpoint() {{ String url = "{LITERAL}"; }} }}\n',
+        encoding="utf-8",
+    )
+    _commit(root, path)
+    _policy(root, "java")
+
+    report = apply_dynamic_resolutions(root)
+
+    assert report.replacements == 0
+    assert report.unresolved == ("Client.java",)
+    assert LITERAL in path.read_text(encoding="utf-8")
+
+
 def test_java_leaves_compile_time_constant_only_file_unresolved(tmp_path):
     root = _repo(tmp_path / "repo")
     path = root / "Client.java"
