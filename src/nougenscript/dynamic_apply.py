@@ -346,6 +346,61 @@ def _go_os_import(root: Any, source: bytes) -> tuple[bool, str | None]:
     return False, None
 
 
+def _go_declares_identifier(root: Any, source: bytes, name: str) -> bool:
+    """Conservatively detect declarations that could shadow a package import.
+
+    The check is intentionally file-wide: false positives leave a finding
+    unresolved, while missing a shadow could emit code that does not compile.
+    """
+    declaration_types = {
+        "const_spec", "function_declaration", "parameter_declaration",
+        "type_spec", "var_spec",
+    }
+    stack = [root]
+    while stack:
+        node = stack.pop()
+        if node.type in declaration_types:
+            declared = node.child_by_field_name("name")
+            if declared is not None:
+                names = [declared]
+                while names:
+                    candidate = names.pop()
+                    if candidate.type == "identifier" and _tree_text(source, candidate).decode("utf-8") == name:
+                        return True
+                    names.extend(candidate.children)
+        elif node.type == "short_var_declaration":
+            left = node.child_by_field_name("left")
+            if left is not None:
+                names = [left]
+                while names:
+                    candidate = names.pop()
+                    if candidate.type == "identifier" and _tree_text(source, candidate).decode("utf-8") == name:
+                        return True
+                    names.extend(candidate.children)
+        elif node.type == "range_clause":
+            left = node.child_by_field_name("left")
+            right = node.child_by_field_name("right")
+            if (left is not None and right is not None
+                    and b":=" in source[left.end_byte:right.start_byte]):
+                names = [left]
+                while names:
+                    candidate = names.pop()
+                    if candidate.type == "identifier" and _tree_text(source, candidate).decode("utf-8") == name:
+                        return True
+                    names.extend(candidate.children)
+        elif node.type == "type_switch_statement":
+            alias = node.child_by_field_name("alias")
+            if alias is not None:
+                names = [alias]
+                while names:
+                    candidate = names.pop()
+                    if candidate.type == "identifier" and _tree_text(source, candidate).decode("utf-8") == name:
+                        return True
+                    names.extend(candidate.children)
+        stack.extend(node.children)
+    return False
+
+
 def _prepare_go_file(
     path: Path, relative: str, rules: list[dict[str, Any]], findings: list[Any]
 ) -> tuple[str | None, int, bool, bytes]:
@@ -364,7 +419,29 @@ def _prepare_go_file(
     if has_os_import and os_name is None:
         # Dot and blank imports cannot be referenced by generated expressions.
         return None, 0, bool(findings), original
-    os_name = os_name or "os"
+    if has_os_import:
+        assert os_name is not None
+        if _go_declares_identifier(tree.root_node, original, os_name):
+            # Do not generate a reference that a local/package declaration can
+            # capture instead of the imported package.
+            return None, 0, bool(findings), original
+        import_alias = None
+    else:
+        # Pick a deterministic import alias absent from every identifier in the
+        # file so generated package references cannot be captured by user code.
+        identifiers: set[str] = set()
+        stack = [tree.root_node]
+        while stack:
+            node = stack.pop()
+            if node.type == "identifier":
+                identifiers.add(_tree_text(original, node).decode("utf-8"))
+            stack.extend(node.children)
+        import_alias = "__nougen_udct_os"
+        suffix = 2
+        while import_alias in identifiers:
+            import_alias = f"__nougen_udct_os_{suffix}"
+            suffix += 1
+        os_name = import_alias
 
     rule_by_id = {rule["id"]: rule for rule in rules}
     by_location = {(finding.line, finding.column): finding for finding in findings}
@@ -409,7 +486,9 @@ def _prepare_go_file(
             raise ValueError(f"cannot safely transform {relative}: package clause is unavailable")
         insertion = package.end_byte
         newline = b"\r\n" if b"\r\n" in original else b"\n"
-        rewritten = rewritten[:insertion] + newline + b'import "os"' + rewritten[insertion:]
+        assert import_alias is not None
+        import_line = f'import {import_alias} "os"'.encode("ascii")
+        rewritten = rewritten[:insertion] + newline + import_line + rewritten[insertion:]
     checked = parser.parse(rewritten)
     if checked is None or checked.root_node.has_error:
         raise ValueError(f"cannot safely transform {relative}: generated Go syntax is invalid")

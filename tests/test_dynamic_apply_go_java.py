@@ -90,6 +90,54 @@ def test_go_leaves_dot_imports_unresolved(tmp_path):
     assert LITERAL in path.read_text(encoding="utf-8")
 
 
+def test_go_generated_import_alias_is_collision_free_with_local_os(tmp_path):
+    root = _repo(tmp_path / "repo")
+    path = root / "client.go"
+    path.write_text(
+        f'package main\n'
+        f'type fake struct{{}}\n'
+        f'func (fake) LookupEnv(string) (string, bool) {{ return "", false }}\n'
+        f'func endpoint() string {{ os := fake{{}}; endpoint := "{LITERAL}"; _ = os; return endpoint }}\n',
+        encoding="utf-8",
+    )
+    _commit(root, path)
+    _policy(root, "go")
+
+    preview = apply_dynamic_resolutions(root)
+    report = apply_dynamic_resolutions(root, write=True, confirm=preview.plan_id)
+
+    content = path.read_text(encoding="utf-8")
+    assert report.replacements == 1
+    assert 'import __nougen_udct_os "os"' in content
+    assert "__nougen_udct_os.LookupEnv(\"API_BASE_URL\")" in content
+    if shutil.which("go"):
+        subprocess.run(
+            ["go", "test", "./..."], cwd=root,
+            env={**os.environ, "GO111MODULE": "off"}, check=True, capture_output=True, text=True,
+        )
+
+
+def test_go_existing_import_shadow_is_left_unresolved(tmp_path):
+    root = _repo(tmp_path / "repo")
+    path = root / "client.go"
+    path.write_text(
+        f'package main\n'
+        f'import "os"\n'
+        f'type fake struct{{}}\n'
+        f'func (fake) LookupEnv(string) (string, bool) {{ return "", false }}\n'
+        f'func endpoint() string {{ os := fake{{}}; endpoint := "{LITERAL}"; _ = os; return endpoint }}\n',
+        encoding="utf-8",
+    )
+    _commit(root, path)
+    _policy(root, "go")
+
+    report = apply_dynamic_resolutions(root)
+
+    assert report.replacements == 0
+    assert report.unresolved == ("client.go",)
+    assert LITERAL in path.read_text(encoding="utf-8")
+
+
 def test_java_rewrites_runtime_values_and_preserves_compile_time_constants(tmp_path):
     root = _repo(tmp_path / "repo")
     path = root / "Client.java"
