@@ -157,6 +157,24 @@ def test_go_existing_import_shadow_checks_all_and_variadic_parameter_names(tmp_p
     assert LITERAL in path.read_text(encoding="utf-8")
 
 
+def test_go_existing_import_shadow_checks_all_var_declaration_names(tmp_path):
+    root = _repo(tmp_path / "repo")
+    path = root / "client.go"
+    path.write_text(
+        f'package main\nimport "os"\n'
+        f'func endpoint() string {{ var a, os string; _, _ = a, os; url := "{LITERAL}"; return url }}\n',
+        encoding="utf-8",
+    )
+    _commit(root, path)
+    _policy(root, "go")
+
+    report = apply_dynamic_resolutions(root)
+
+    assert report.replacements == 0
+    assert report.unresolved == ("client.go",)
+    assert LITERAL in path.read_text(encoding="utf-8")
+
+
 def test_java_rewrites_runtime_values_and_preserves_compile_time_constants(tmp_path):
     root = _repo(tmp_path / "repo")
     path = root / "Client.java"
