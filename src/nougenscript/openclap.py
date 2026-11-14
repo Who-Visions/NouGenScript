@@ -1,6 +1,6 @@
-"""OpenClap Universal AI Film & Screenplay Interchange (.clap) Serializer.
+"""NouGenClap Universal AI Film & Screenplay Interchange (.clap) Serializer.
 
-Assimilated from jbilcke-hf/OpenClap-Format standard.
+Assimilated from OpenClap / jbilcke-hf format into native NouGen styling.
 Multi-document YAML stream architecture with multi-track timeline tracks.
 """
 from __future__ import annotations
@@ -23,8 +23,8 @@ class ClapDocument:
     segments: list[dict[str, Any]] = field(default_factory=list)
 
 
-class OpenClapSerializer:
-    """Serializes Screenplay AST into OpenClap multi-document YAML or compressed .clap bundle."""
+class NouGenClapSerializer:
+    """Serializes Screenplay AST into NouGenClap multi-document YAML or compressed .clap bundle."""
 
     @staticmethod
     def to_documents(script: Screenplay) -> list[dict[str, Any]]:
@@ -104,3 +104,7 @@ class OpenClapSerializer:
         """Export as gzip compressed .clap package."""
         yaml_text = cls.to_yaml_stream(script)
         return gzip.compress(yaml_text.encode("utf-8"))
+
+
+# Backwards-compatibility alias
+OpenClapSerializer = NouGenClapSerializer
