@@ -25,7 +25,7 @@ from nougenscript.dialects import (
 )
 from nougenscript.dual_plane import DisplaySpan, DualPlaneProjector, SpokenToken
 from nougenscript.engine import UniversalScriptEngine
-from nougenscript.openclap import ClapDocument, OpenClapSerializer
+from nougenscript.openclap import ClapDocument, NouGenClapSerializer, OpenClapSerializer
 from nougenscript.parser import FountainParser
 from nougenscript.persona import (
     BEHAVIORAL_MASKS,
@@ -171,6 +171,7 @@ __all__ = [
     "MasterCraftReport",
     "MasterCraftSuite",
     "NodeType",
+    "NouGenClapSerializer",
     "OpenClapSerializer",
     "Persona",
     "PolyScript",

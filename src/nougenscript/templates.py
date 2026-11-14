@@ -9,6 +9,7 @@ Generators for world-class script frameworks:
 """
 from __future__ import annotations
 
+import math
 import os
 from dataclasses import dataclass, field
 from typing import Any
@@ -501,3 +502,180 @@ def generate_backward_plan(title: str = "Untitled Feature",
         ),
     ]
     return TeleologicalNarrativePlan(title=title, terminal_climax=terminal_climax, steps=steps)
+
+
+# ======================================================================== #
+# 7. Universal Deterministic Calculated Templates (UDCT Engine)
+# ======================================================================== #
+
+@dataclass
+class UDCTInputState:
+    """Input State S for UDCT calculation."""
+    duration: float
+    fps: int
+    subject_count: int = 1
+    event_count: int = 1
+    parameters: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def total_frames(self) -> int:
+        return max(1, int(round(self.duration * self.fps)))
+
+
+@dataclass
+class UDCTFrameState:
+    """Deterministic mathematical state calculated for a single frame index i."""
+    frame_index: int
+    time_normalized: float  # t in [0.0, 1.0]
+    time_seconds: float
+    position: dict[str, float]
+    velocity: dict[str, float]
+    intensity: float
+    phase: float
+    camera: dict[str, float]
+    custom: dict[str, float] = field(default_factory=dict)
+
+
+@dataclass
+class UDCTCalculationResult:
+    """Instantiated output O = G(S, Theta, F, C)."""
+    input_state: UDCTInputState
+    total_frames: int
+    frame_states: list[UDCTFrameState]
+    rendered_frames: list[str]
+    canonical_hash: str
+
+
+class UniversalDeterministicCalculatedTemplate:
+    """Universal Deterministic Calculated Template Engine: UDCT = G(S, Theta, F, C).
+
+    Non-negotiable architectural invariant:
+    The template is not the intelligence — it is the renderer for an underlying
+    deterministic state machine where:
+      Intent -> Parameters -> Equations -> State -> Template -> Rendered Output
+    """
+
+    DEFAULT_RENDER_TEMPLATE = (
+        "FRAME {frame_index:04d} | t={time_normalized:.4f} ({time_seconds:.2f}s)\n"
+        "  subject.position = ({pos_x:.3f}, {pos_y:.3f}, {pos_z:.3f})\n"
+        "  subject.velocity = ({vel_x:.3f}, {vel_y:.3f}, {vel_z:.3f})\n"
+        "  camera = (yaw={cam_yaw:.2f}°, pitch={cam_pitch:.2f}°, dist={cam_dist:.2f})\n"
+        "  motion.phase = {phase:.4f} | intensity = {intensity:.4f}"
+    )
+
+    @staticmethod
+    def normalized_time(frame: int, total_frames: int) -> float:
+        if total_frames <= 1:
+            return 0.0
+        return max(0.0, min(1.0, frame / (total_frames - 1)))
+
+    @staticmethod
+    def lerp(a: float, b: float, t: float) -> float:
+        return a + (b - a) * t
+
+    @staticmethod
+    def ease_cubic(t: float) -> float:
+        """Cubic bezier ease-in-out."""
+        return 4 * t * t * t if t < 0.5 else 1 - math.pow(-2 * t + 2, 3) / 2
+
+    @classmethod
+    def calculate(
+        cls,
+        state: UDCTInputState,
+        start_pos: tuple[float, float, float] = (0.0, 0.0, 0.0),
+        end_pos: tuple[float, float, float] = (18.0, 0.0, 0.0),
+        camera_yaw_range: tuple[float, float] = (-15.0, 35.0),
+        camera_pitch: float = 12.0,
+        render_template: str = DEFAULT_RENDER_TEMPLATE,
+    ) -> UDCTCalculationResult:
+        import hashlib
+        import json
+        import math
+
+        total_frames = state.total_frames
+        dt = 1.0 / state.fps if state.fps > 0 else 1.0
+        frame_states: list[UDCTFrameState] = []
+        rendered_frames: list[str] = []
+
+        prev_pos = list(start_pos)
+
+        for i in range(total_frames):
+            t = cls.normalized_time(i, total_frames)
+            t_sec = i * dt
+            e_t = cls.ease_cubic(t)
+
+            # Position x(t) = x_0 + (x_1 - x_0) * E(t)
+            pos_x = cls.lerp(start_pos[0], end_pos[0], e_t)
+            pos_y = cls.lerp(start_pos[1], end_pos[1], e_t)
+            pos_z = cls.lerp(start_pos[2], end_pos[2], e_t)
+
+            # Velocity v_i = (x_i - x_{i-1}) / dt
+            if i == 0:
+                vel_x, vel_y, vel_z = 0.0, 0.0, 0.0
+            else:
+                vel_x = (pos_x - prev_pos[0]) / dt
+                vel_y = (pos_y - prev_pos[1]) / dt
+                vel_z = (pos_z - prev_pos[2]) / dt
+            prev_pos = [pos_x, pos_y, pos_z]
+
+            # Intensity I(t) = I_min + (I_max - I_min) * sin^2(pi * t)
+            intensity = math.sin(math.pi * t) ** 2
+
+            # Phase tracking (cyclic parameter)
+            phase = (t * 2.0 * math.pi) % (2.0 * math.pi)
+
+            # Camera calculation C(t_i, x_i, v_i)
+            cam_yaw = cls.lerp(camera_yaw_range[0], camera_yaw_range[1], t)
+            cam_dist = 5.0 + (intensity * 2.5)
+
+            f_state = UDCTFrameState(
+                frame_index=i,
+                time_normalized=t,
+                time_seconds=t_sec,
+                position={"x": pos_x, "y": pos_y, "z": pos_z},
+                velocity={"x": vel_x, "y": vel_y, "z": vel_z},
+                intensity=intensity,
+                phase=phase,
+                camera={"yaw": cam_yaw, "pitch": camera_pitch, "distance": cam_dist},
+            )
+            frame_states.append(f_state)
+
+            rendered = render_template.format(
+                frame_index=i,
+                time_normalized=t,
+                time_seconds=t_sec,
+                pos_x=pos_x,
+                pos_y=pos_y,
+                pos_z=pos_z,
+                vel_x=vel_x,
+                vel_y=vel_y,
+                vel_z=vel_z,
+                cam_yaw=cam_yaw,
+                cam_pitch=camera_pitch,
+                cam_dist=cam_dist,
+                phase=phase,
+                intensity=intensity,
+            )
+            rendered_frames.append(rendered)
+
+        # Byte-stable canonical hash across the computed states
+        hash_payload = {
+            "duration": state.duration,
+            "fps": state.fps,
+            "total_frames": total_frames,
+            "start_pos": start_pos,
+            "end_pos": end_pos,
+            "sample_mid": frame_states[total_frames // 2].position if total_frames > 0 else {},
+            "sample_end": frame_states[-1].position if total_frames > 0 else {},
+        }
+        canonical_bytes = json.dumps(hash_payload, sort_keys=True).encode("utf-8")
+        canonical_hash = hashlib.sha256(canonical_bytes).hexdigest()
+
+        return UDCTCalculationResult(
+            input_state=state,
+            total_frames=total_frames,
+            frame_states=frame_states,
+            rendered_frames=rendered_frames,
+            canonical_hash=canonical_hash,
+        )
+
