@@ -15,19 +15,27 @@ It handles **all script paradigms under one unified AST**:
 3. **Playwriting & Theatre**: Stage plays, proscenium and black-box stage directions, character entrances/exits, and monologues.
 4. **Comic Book Scripts**: Page-by-page, panel-by-panel comic scripts with visual descriptions, dialogue balloons, captions, and SFX.
 5. **Email Outreach Scripts**: Marketing, cold outreach, and nurture sequences (Subject lines, Preview headers, Body, CTA buttons, and P.S. lines).
-6. **Code Scripts (TypeScript, JavaScript, Python, Bash)**: Engineering scripts with syntax encapsulation, dependency detection, export tracking, and AST metadata.
-7. **Dual-Plane Script Architecture (`DisplayPlane != SpeechPlane`)**:
+6. **Creator Video Scripts**: Talking Head, Short-Form Reel, and YouTube Long-Form with 3-second hook directives, retention gates, and pattern interrupts.
+7. **Code Scripts (TypeScript, JavaScript, Python, Bash)**: Engineering scripts with syntax encapsulation, dependency detection, export tracking, and AST metadata.
+8. **Dual-Plane Script Architecture (`DisplayPlane != SpeechPlane`)**:
    - Authored scripts decompose bijectively into talent-facing display elements (`DIRECTION`, `CUE`, `PAUSE`, `MEDIA`) and speech-recognition / voice-synthesis stream tokens (`SPOKEN`).
-8. **SPITE Psychological Depth Engine**:
+9. **SPITE Psychological Depth Engine**:
    - Character shadow-self tracking, volatility indices ($0.0 \dots 1.0$), teleological core motives, and subtext leakage detection across lines.
-9. **Deterministic Persona & Behavioral Masks (`persona.py`)**:
-   - Audience / writer persona resolution with deterministic SHA-256 fingerprinting.
-   - 20-Pack composable behavioral masks (`stoic`, `villain`, `witty`, `charming`, `gremlin`, etc.) for director/actor prompts.
+10. **Deterministic Persona & Behavioral Masks (`persona.py`)**:
+   - 25 Composable behavioral masks including the **Dav1d Hip-Hop Mogul Voices** (`sosa`, `curtis`, `ye`, `hov`, `lupe`).
    - 20-Pack emotional spectrum (`ecstatic` $\dots$ `enraged`) for delivery cues and somatic inflection.
-10. **OpenClap Interchange Format (`.clap`)**:
-   - Universal multi-document YAML serialization compatible with OpenClap multi-track audio-visual timelines (video, dialogue, sound, music).
-11. **Command-Line Interface (`nougenscript`)**:
-   - Unified CLI for parsing, poly-dialect compilation, dual-plane projection, SPITE subtext evaluation, OpenClap bundling, and persona mask composition.
+11. **Elite 0.001% Narrative Validators (`validators.py` & `narrative_craft.py`)**:
+   - **Mamet Auditing**: 3 non-negotiable scene questions (Objective, Stakes, Urgency).
+   - **Sorkin Cadence Analysis**: Dialogue velocity, turn distribution, repetition rhythms.
+   - **Thirty-Act Structure**: The Dav3 Standard 30-Act feature architecture with meta-bridges.
+   - **Mythic Noir Anti-Cliché**: MCU quip purge and somatic power-cost laws.
+   - **Causal Momentum**: 'Therefore' / 'But' vs 'And then' narrative propulsion.
+12. **Kaedra Continuity & Teleological Planning (`core.py`, `templates.py`)**:
+   - **ContinuityTracker**: Real-time state machine tracking props, active threads, locations, and character emotional parentheticals.
+   - **Backward-Causal Planning**: Reverse-engineering plotlines backwards from the locked ending.
+13. **Dav1d Bayesian Instinct Engine & Reasoning Sandwich (`instincts.py`, `sandwich.py`)**:
+   - **InstinctRecorder**: Asymptotically learned behavioral reflexes with Bayesian confidence scoring.
+   - **ReasoningSandwich**: 11-step outcome verification pipeline for production-ready screenplay assurance.
 
 ---
 
@@ -50,79 +58,76 @@ Authored Script Source (Fountain / Markdown / YAML)
 
 ### Python Engine
 ```python
-from nougenscript import Screenplay, SpiteProfile, SubtextAnalyzer, CharacterPersona, blend, get_emotion
-
-# Parse a script
-script = Screenplay.from_fountain("""
-EXT. NEO-DETROIT UNDERPASS - NIGHT
-
-ELISÉE
-(whispering, trembling)
-Everything is fine. The code is sealed.
-
-Corbin steps from the shadows.
-""")
-
-# Evaluate subtext
-profile = SpiteProfile(
-    character="ELISÉE",
-    shadow_self="Terror of consensus reality dissolving into chaotic noise",
-    volatility=0.65
+from nougenscript import (
+    Screenplay,
+    SpiteProfile,
+    SubtextAnalyzer,
+    CharacterPersona,
+    blend,
+    get_emotion,
+    ContinuityTracker,
+    generate_backward_plan,
+    generate_thirty_act_scaffold,
+    ReasoningSandwich,
+    InstinctRecorder,
 )
 
-analysis = SubtextAnalyzer.analyze(script.dialogue_lines[0], profile)
-print(analysis.markers)  # ['Defensive Absolutism: fine']
-print(analysis.leakage_detected)  # True
+# 1. Backward-Causal Teleological Planning
+plan = generate_backward_plan(
+    title="Project Nightfall",
+    terminal_climax="Corbin burns the archive to prevent the uplink."
+)
 
-# Compose Behavioral Masks & Emotions
+# 2. 11-Step Reasoning Sandwich Audit
+result = ReasoningSandwich.audit_script_outcome(
+    spec="Feature Noir scene compliance",
+    script_text="INT. ARCHIVE - NIGHT\nCORBIN\nThe resonance burns through my collar.\n"
+)
+print("Sandwich Status:", result.overall_passed)
+
+# 3. Dav1d Mogul Persona Composition
 char = CharacterPersona(
     character_name="CORBIN",
-    masks=blend("stoic", "villain"),
-    current_emotion=get_emotion("furious"),
-    taboo_words={"mercy"}
+    masks=blend("hov", "curtis"),
+    current_emotion=get_emotion("focused")
 )
-line = char.format_dialogue("The throne belongs to the dust.")
-print(line.parenthetical)  # '(Furious, blunt, biting, demanding accountability.)'
 ```
 
 ### CLI Usage
 ```bash
-# Parse screenplay
-nougenscript parse script.fountain
+# Elite Craft & Status Auditing
+nougenscript craft screenplay.fountain
+nougenscript status-map screenplay.fountain
 
-# Decompose planes and inspect word re-anchoring
-nougenscript dual-plane script.fountain --reanchor 12
+# 11-Step Reasoning Sandwich
+nougenscript sandwich screenplay.fountain --spec "Feature Noir Act I"
 
-# Run SPITE subtext analysis
-nougenscript spite script.fountain --character XOAH --volatility 0.8
+# Bayesian Instincts
+nougenscript instinct record --category anti_cliche --pattern "Well that just happened" --response "Purge MCU quip."
+nougenscript instinct list
 
-# Export to OpenClap (.clap)
-nougenscript export-clap script.fountain -o scene1.clap
-
-# Compose behavioral masks
-nougenscript persona --blend stoic witty --emotion ecstatic --character XOAH
-
-# Compile and inspect PolyScript dialects (TV, Comic, Play, Email, Code)
-nougenscript poly tv episode1.tv
-nougenscript poly comic issue1.comic
-nougenscript poly play hamlet_act1.play
-nougenscript poly email outreach_sequence.txt
-nougenscript poly typescript app.ts
-nougenscript poly python daemon.py
+# Scaffold Generators
+nougenscript generate thirty-acts --title "Veil City" --protagonist "CORBIN" --shadow "THE ARCHITECT"
+nougenscript generate backward-plan --title "Veil City"
+nougenscript generate talking-head --topic "Zero-Cost Swarm Architecture"
 ```
 
 ---
 
 ## 📦 File Architecture
-- `src/nougenscript/core.py`: Canonical AST nodes (`Scene`, `Dialogue`, `Direction`, `Cue`).
-- `src/nougenscript/dialects.py`: PolyScript domain matrix (`NARRATIVE_FILM`, `TELEVISION`, `THEATRE`, `COMIC_BOOK`, `EMAIL_CAMPAIGN`, `CODE_TYPESCRIPT`, `CODE_JAVASCRIPT`, `CODE_PYTHON`, `CODE_SHELL`).
+- `src/nougenscript/core.py`: Canonical AST nodes (`Scene`, `Dialogue`, `Direction`, `Cue`, `ContinuityTracker`).
+- `src/nougenscript/dialects.py`: PolyScript domain matrix (`NARRATIVE_FILM`, `CREATOR_VIDEO`, `TELEVISION`, `THEATRE`, `COMIC_BOOK`, `EMAIL_CAMPAIGN`, `CODE_TYPESCRIPT`, `CODE_PYTHON`).
 - `src/nougenscript/engine.py`: Universal poly-script compiler, parser, and code encapsulator.
 - `src/nougenscript/dual_plane.py`: Bijective Display vs Speech plane projector and word anchor locator.
 - `src/nougenscript/spite.py`: SPITE psychological depth, character profiling, and subtext analyzer.
-- `src/nougenscript/persona.py`: Signals, deterministic persona resolver, 20 behavioral masks, 20 emotions, and character contract.
-- `src/nougenscript/openclap.py`: Universal `.clap` multi-document YAML stream serializer and parser.
-- `src/nougenscript/parser.py`: Fast, deterministic Fountain and text screenplay parser.
-- `src/nougenscript/cli.py`: Unified command-line interface with `poly` multi-dialect support.
-- `tests/`: Complete pytest test suite verifying all parser, dual-plane, SPITE, persona, and poly-dialect invariants.
+- `src/nougenscript/persona.py`: Signals, deterministic persona resolver, 25 behavioral masks (including `sosa`, `curtis`, `ye`, `hov`, `lupe`), and 20 emotions.
+- `src/nougenscript/instincts.py`: Dav1d Bayesian-lite adaptive behavioral instinct recorder.
+- `src/nougenscript/sandwich.py`: Dav1d 11-step reasoning sandwich verification engine.
+- `src/nougenscript/narrative_craft.py`: Top 0.001% master craft suite (Mamet, Sorkin cadence, causality, status transactions, recursion).
+- `src/nougenscript/validators.py`: Elite dialect validators (Save the Cat, Harmon Circle, 30-Act, Mythic Noir, Video Retention).
+- `src/nougenscript/templates.py`: Scaffolds (30-Act, Harmon Circle, Aristotle Unity, Creator Video, Backward-Causal).
+- `src/nougenscript/cli.py`: Unified command-line interface with `sandwich`, `instinct`, `craft`, `generate`, and `poly`.
+- `tests/`: 75 comprehensive tests covering all engines and validators.
+
 
 
