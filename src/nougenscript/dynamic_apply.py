@@ -191,6 +191,466 @@ def _prepare_file(
     return rewritten, len(edits), len(edits) != len(by_location), original_bytes
 
 
+def _tree_sitter_parser(path: Path):
+    """Create a pinned, in-process parser without fetching grammars at runtime."""
+    from tree_sitter import Language, Parser
+
+    suffix = path.suffix.lower()
+    if suffix in {".js", ".jsx", ".mjs", ".cjs"}:
+        import tree_sitter_javascript
+
+        grammar = tree_sitter_javascript.language()
+    elif suffix in {".ts", ".tsx"}:
+        import tree_sitter_typescript
+
+        grammar = (tree_sitter_typescript.language_tsx() if suffix == ".tsx"
+                   else tree_sitter_typescript.language_typescript())
+    elif suffix == ".go":
+        import tree_sitter_go
+
+        grammar = tree_sitter_go.language()
+    elif suffix == ".java":
+        import tree_sitter_java
+
+        grammar = tree_sitter_java.language()
+    else:
+        raise ValueError(f"cannot safely transform {path.name}: unsupported language")
+    return Parser(Language(grammar))
+
+
+def _parse_js_ts(parser: Any, source: bytes) -> Any:
+    return parser.parse(source)
+
+
+def _js_binding_contains(node: Any, name: str) -> bool:
+    """Return whether a JavaScript binding pattern declares ``name``."""
+    if node.type in {"identifier", "shorthand_property_identifier_pattern"}:
+        return node.text.decode("utf-8") == name
+    if node.type == "pair_pattern":
+        value = node.child_by_field_name("value")
+        return value is not None and _js_binding_contains(value, name)
+    if node.type == "assignment_pattern":
+        left = node.child_by_field_name("left")
+        return left is not None and _js_binding_contains(left, name)
+    if node.type == "type_annotation":
+        return False
+    return any(_js_binding_contains(child, name) for child in node.named_children)
+
+
+def _js_declares_binding(root: Any, name: str) -> bool:
+    """Conservatively detect file-local bindings that can capture globals.
+
+    A file-wide check intentionally prefers leaving a candidate unresolved over
+    emitting ``process.env`` that binds to a local parameter or declaration.
+    """
+    declaration_fields = {
+        "variable_declarator": ("name",),
+        "function_declaration": ("name", "parameters"),
+        "function_expression": ("name", "parameters"),
+        "generator_function_declaration": ("name", "parameters"),
+        "generator_function": ("name", "parameters"),
+        "class_declaration": ("name",),
+        "class": ("name",),
+        "method_definition": ("parameters",),
+        "arrow_function": ("parameters",),
+        "catch_clause": ("parameter",),
+        "import_specifier": ("alias",),
+        "import_clause": ("*",),
+        "namespace_import": ("name",),
+    }
+    stack = [root]
+    while stack:
+        node = stack.pop()
+        for field in declaration_fields.get(node.type, ()):
+            bindings = node.named_children if field == "*" else (node.child_by_field_name(field),)
+            if any(binding is not None and _js_binding_contains(binding, name) for binding in bindings):
+                return True
+        stack.extend(node.children)
+    return False
+
+
+def _is_js_initializer(node: Any) -> bool:
+    """Limit JS/TS writes to direct variable, object-property, and assignment values."""
+    parent = node.parent
+    if parent is None:
+        return False
+    return (
+        (parent.type == "variable_declarator" and parent.child_by_field_name("value") == node)
+        or (parent.type == "pair" and parent.child_by_field_name("value") == node)
+        or (parent.type == "assignment_expression" and parent.child_by_field_name("right") == node)
+    )
+
+
+def _prepare_js_ts_file(
+    path: Path, relative: str, rules: list[dict[str, Any]], findings: list[Any]
+) -> tuple[str | None, int, bool, bytes]:
+    """Prepare exact, syntax-checked JavaScript/TypeScript initializer rewrites.
+
+    Escaped strings and other expression contexts remain unresolved. The parser
+    establishes syntax and token boundaries; only complete, unescaped string
+    values at direct initializer sites can be replaced.
+    """
+    with path.open("rb") as source_file:
+        original_bytes = source_file.read(1_000_001)
+    if len(original_bytes) > 1_000_000:
+        raise ValueError(f"cannot safely transform {relative}: source exceeds the 1 MB parser limit")
+    try:
+        original_bytes.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValueError(f"cannot safely transform {relative}: source is not UTF-8") from exc
+    parser = _tree_sitter_parser(path)
+    tree = _parse_js_ts(parser, original_bytes)
+    if tree is None:
+        raise ValueError(f"cannot safely transform {relative}: parser could not produce a syntax tree")
+    if tree.root_node.has_error:
+        raise ValueError(f"cannot safely transform {relative}: invalid or unsupported JavaScript/TypeScript syntax")
+
+    if _js_declares_binding(tree.root_node, "process"):
+        return None, 0, bool(findings), original_bytes
+
+    rule_by_id = {rule["id"]: rule for rule in rules}
+    by_location: dict[tuple[int, int], Any] = {}
+    for finding in findings:
+        key = (finding.line, finding.column)
+        previous = by_location.get(key)
+        if previous is not None and previous.slot != finding.slot:
+            raise ValueError(f"conflicting UDCT slots target {relative}:{finding.line}")
+        by_location[key] = finding
+
+    line_starts = [0]
+    line_starts.extend(index + 1 for index, byte in enumerate(original_bytes) if byte == 0x0A)
+    nodes_by_location: dict[tuple[int, int], Any] = {}
+    stack = [tree.root_node]
+    while stack:
+        node = stack.pop()
+        if node.type == "string" and _is_js_initializer(node):
+            line_index = node.start_point.row
+            content_start = node.start_byte + 1
+            line_start = line_starts[line_index]
+            column = len(original_bytes[line_start:content_start].decode("utf-8")) + 1
+            nodes_by_location[(line_index + 1, column)] = node
+        stack.extend(reversed(node.children))
+
+    edits: list[tuple[int, int, bytes]] = []
+    for finding in by_location.values():
+        rule = rule_by_id[finding.rule_id]
+        literal = rule["literal"]
+        node = nodes_by_location.get((finding.line, finding.column))
+        if node is not None:
+            token = original_bytes[node.start_byte:node.end_byte]
+            if len(token) < 2 or token[:1] not in (b"'", b'"') or token[-1:] != token[:1]:
+                continue
+            value = token[1:-1]
+            if b"\\" in value or value != literal:
+                continue
+            slot = rule["slot"]
+            escaped_slot = json.dumps(slot, ensure_ascii=True)
+            replacement = (
+                f"process.env[{escaped_slot}] ?? (() => {{ throw new Error({json.dumps(slot + ' must be set')}); }})()"
+            ).encode("ascii")
+            edits.append((node.start_byte, node.end_byte, replacement))
+
+    if not edits:
+        return None, 0, bool(findings), original_bytes
+    rewritten = original_bytes
+    for start, end, replacement in sorted(edits, reverse=True):
+        rewritten = rewritten[:start] + replacement + rewritten[end:]
+    rewritten_tree = _parse_js_ts(parser, rewritten)
+    if rewritten_tree is None:
+        raise ValueError(f"cannot safely transform {relative}: parser could not validate generated syntax")
+    if rewritten_tree.root_node.has_error:
+        raise ValueError(f"cannot safely transform {relative}: generated JavaScript/TypeScript syntax is invalid")
+    return rewritten.decode("utf-8"), len(edits), len(edits) != len(by_location), original_bytes
+
+
+def _tree_text(source: bytes, node: Any) -> bytes:
+    return source[node.start_byte:node.end_byte]
+
+
+def _is_go_runtime_initializer(node: Any) -> bool:
+    parent = node.parent
+    if parent is None or parent.type != "expression_list":
+        return False
+    declaration = parent.parent
+    if declaration is None:
+        return False
+    if declaration.type in {"short_var_declaration", "assignment_statement"}:
+        return declaration.child_by_field_name("right") == parent
+    if declaration.type == "var_spec":
+        # Go constants are compile-time expressions and must never be rewritten.
+        return declaration.child_by_field_name("value") == parent
+    return False
+
+
+def _go_os_import(root: Any, source: bytes) -> tuple[bool, str | None]:
+    stack = [root]
+    while stack:
+        node = stack.pop()
+        if node.type == "import_spec":
+            path = node.child_by_field_name("path")
+            if path is not None and _tree_text(source, path) == b'"os"':
+                alias = node.child_by_field_name("name")
+                name = _tree_text(source, alias).decode("ascii") if alias is not None else "os"
+                return True, None if name in {".", "_"} else name
+        stack.extend(node.children)
+    return False, None
+
+
+def _go_declares_identifier(root: Any, source: bytes, name: str) -> bool:
+    """Conservatively detect declarations that could shadow a package import.
+
+    The check is intentionally file-wide: false positives leave a finding
+    unresolved, while missing a shadow could emit code that does not compile.
+    """
+    declaration_types = {
+        "const_spec", "function_declaration", "parameter_declaration",
+        "variadic_parameter_declaration", "type_spec", "var_spec",
+    }
+    stack = [root]
+    while stack:
+        node = stack.pop()
+        if node.type in declaration_types:
+            names = list(node.children_by_field_name("name"))
+            while names:
+                candidate = names.pop()
+                if candidate.type == "identifier" and _tree_text(source, candidate).decode("utf-8") == name:
+                    return True
+                names.extend(candidate.children)
+        elif node.type == "short_var_declaration":
+            left = node.child_by_field_name("left")
+            if left is not None:
+                names = [left]
+                while names:
+                    candidate = names.pop()
+                    if candidate.type == "identifier" and _tree_text(source, candidate).decode("utf-8") == name:
+                        return True
+                    names.extend(candidate.children)
+        elif node.type == "range_clause":
+            left = node.child_by_field_name("left")
+            right = node.child_by_field_name("right")
+            if (left is not None and right is not None
+                    and b":=" in source[left.end_byte:right.start_byte]):
+                names = [left]
+                while names:
+                    candidate = names.pop()
+                    if candidate.type == "identifier" and _tree_text(source, candidate).decode("utf-8") == name:
+                        return True
+                    names.extend(candidate.children)
+        elif node.type == "type_switch_statement":
+            alias = node.child_by_field_name("alias")
+            if alias is not None:
+                names = [alias]
+                while names:
+                    candidate = names.pop()
+                    if candidate.type == "identifier" and _tree_text(source, candidate).decode("utf-8") == name:
+                        return True
+                    names.extend(candidate.children)
+        stack.extend(node.children)
+    return False
+
+
+def _prepare_go_file(
+    path: Path, relative: str, rules: list[dict[str, Any]], findings: list[Any]
+) -> tuple[str | None, int, bool, bytes]:
+    original = path.read_bytes()
+    if len(original) > 1_000_000:
+        raise ValueError(f"cannot safely transform {relative}: source exceeds the 1 MB parser limit")
+    try:
+        original.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValueError(f"cannot safely transform {relative}: source is not UTF-8") from exc
+    parser = _tree_sitter_parser(path)
+    tree = parser.parse(original)
+    if tree is None or tree.root_node.has_error:
+        raise ValueError(f"cannot safely transform {relative}: invalid or unsupported Go syntax")
+    has_os_import, os_name = _go_os_import(tree.root_node, original)
+    if has_os_import and os_name is None:
+        # Dot and blank imports cannot be referenced by generated expressions.
+        return None, 0, bool(findings), original
+    if has_os_import:
+        assert os_name is not None
+        if _go_declares_identifier(tree.root_node, original, os_name):
+            # Do not generate a reference that a local/package declaration can
+            # capture instead of the imported package.
+            return None, 0, bool(findings), original
+        import_alias = None
+    else:
+        # Pick a deterministic import alias absent from every identifier in the
+        # file so generated package references cannot be captured by user code.
+        identifiers: set[str] = set()
+        stack = [tree.root_node]
+        while stack:
+            node = stack.pop()
+            if node.type == "identifier":
+                identifiers.add(_tree_text(original, node).decode("utf-8"))
+            stack.extend(node.children)
+        import_alias = "__nougen_udct_os"
+        suffix = 2
+        while import_alias in identifiers:
+            import_alias = f"__nougen_udct_os_{suffix}"
+            suffix += 1
+        os_name = import_alias
+
+    rule_by_id = {rule["id"]: rule for rule in rules}
+    by_location = {(finding.line, finding.column): finding for finding in findings}
+    starts = [0]
+    starts.extend(index + 1 for index, byte in enumerate(original) if byte == 0x0A)
+    candidates: dict[tuple[int, int], Any] = {}
+    stack = [tree.root_node]
+    while stack:
+        node = stack.pop()
+        if node.type == "interpreted_string_literal" and _is_go_runtime_initializer(node):
+            row = node.start_point.row
+            column = len(original[starts[row]:node.start_byte + 1].decode("utf-8")) + 1
+            candidates[(row + 1, column)] = node
+        stack.extend(node.children)
+
+    edits: list[tuple[int, int, bytes]] = []
+    for location, finding in by_location.items():
+        node = candidates.get(location)
+        if node is None:
+            continue
+        rule = rule_by_id[finding.rule_id]
+        token = _tree_text(original, node)
+        literal = rule["literal"]
+        if len(token) < 2 or token[:1] != b'"' or token[-1:] != b'"' or token[1:-1] != literal:
+            continue
+        slot_literal = json.dumps(rule["slot"], ensure_ascii=True)
+        message_literal = json.dumps(rule["slot"] + " must be set", ensure_ascii=True)
+        replacement = (
+            f"func() string {{ value, ok := {os_name}.LookupEnv({slot_literal}); "
+            f"if !ok {{ panic({message_literal}) }}; return value }}()"
+        ).encode("ascii")
+        edits.append((node.start_byte, node.end_byte, replacement))
+
+    if not edits:
+        return None, 0, bool(findings), original
+    rewritten = original
+    for start, end, replacement in sorted(edits, reverse=True):
+        rewritten = rewritten[:start] + replacement + rewritten[end:]
+    if not has_os_import:
+        package = next((node for node in tree.root_node.children if node.type == "package_clause"), None)
+        if package is None:
+            raise ValueError(f"cannot safely transform {relative}: package clause is unavailable")
+        insertion = package.end_byte
+        newline = b"\r\n" if b"\r\n" in original else b"\n"
+        assert import_alias is not None
+        import_line = f'import {import_alias} "os"'.encode("ascii")
+        rewritten = rewritten[:insertion] + newline + import_line + rewritten[insertion:]
+    checked = parser.parse(rewritten)
+    if checked is None or checked.root_node.has_error:
+        raise ValueError(f"cannot safely transform {relative}: generated Go syntax is invalid")
+    return rewritten.decode("utf-8"), len(edits), len(edits) != len(by_location), original
+
+
+def _is_java_runtime_initializer(node: Any) -> bool:
+    parent = node.parent
+    if parent is None:
+        return False
+    if parent.type == "variable_declarator" and parent.child_by_field_name("value") == node:
+        declaration = parent.parent
+        if declaration is None:
+            return False
+        if declaration.type not in {"local_variable_declaration", "field_declaration"}:
+            return False
+        modifiers = declaration.child_by_field_name("modifiers")
+        if modifiers is None:
+            modifiers = next((child for child in declaration.children if child.type == "modifiers"), None)
+        if modifiers is not None and b"final" in modifiers.text:
+            # A final primitive/String variable can be a compile-time constant.
+            return False
+        ancestor = declaration.parent
+        while ancestor is not None:
+            if ancestor.type == "interface_declaration":
+                # Interface fields are implicitly public static final.
+                return False
+            ancestor = ancestor.parent
+        return True
+    return parent.type == "assignment_expression" and parent.child_by_field_name("right") == node
+
+
+def _java_declares_identifier(root: Any, source: bytes, name: str) -> bool:
+    """Conservatively avoid generated fully-qualified names captured by locals."""
+    declaration_types = {
+        "formal_parameter", "spread_parameter", "variable_declarator",
+        "catch_formal_parameter", "resource", "enhanced_for_statement",
+        "class_declaration", "interface_declaration", "enum_declaration",
+        "record_declaration", "record_component", "enum_constant",
+        "annotation_type_declaration",
+    }
+    stack = [root]
+    while stack:
+        node = stack.pop()
+        if node.type in declaration_types:
+            declared = node.child_by_field_name("name")
+            if declared is not None and _tree_text(source, declared).decode("utf-8") == name:
+                return True
+        stack.extend(node.children)
+    return False
+
+
+def _prepare_java_file(
+    path: Path, relative: str, rules: list[dict[str, Any]], findings: list[Any]
+) -> tuple[str | None, int, bool, bytes]:
+    original = path.read_bytes()
+    if len(original) > 1_000_000:
+        raise ValueError(f"cannot safely transform {relative}: source exceeds the 1 MB parser limit")
+    try:
+        original.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValueError(f"cannot safely transform {relative}: source is not UTF-8") from exc
+    parser = _tree_sitter_parser(path)
+    tree = parser.parse(original)
+    if tree is None or tree.root_node.has_error:
+        raise ValueError(f"cannot safely transform {relative}: invalid or unsupported Java syntax")
+
+    if _java_declares_identifier(tree.root_node, original, "java"):
+        return None, 0, bool(findings), original
+
+    rule_by_id = {rule["id"]: rule for rule in rules}
+    by_location = {(finding.line, finding.column): finding for finding in findings}
+    starts = [0]
+    starts.extend(index + 1 for index, byte in enumerate(original) if byte == 0x0A)
+    candidates: dict[tuple[int, int], Any] = {}
+    stack = [tree.root_node]
+    while stack:
+        node = stack.pop()
+        if node.type == "string_literal" and _is_java_runtime_initializer(node):
+            row = node.start_point.row
+            column = len(original[starts[row]:node.start_byte + 1].decode("utf-8")) + 1
+            candidates[(row + 1, column)] = node
+        stack.extend(node.children)
+
+    edits: list[tuple[int, int, bytes]] = []
+    for location, finding in by_location.items():
+        node = candidates.get(location)
+        if node is None:
+            continue
+        rule = rule_by_id[finding.rule_id]
+        token = _tree_text(original, node)
+        literal = rule["literal"]
+        if len(token) < 2 or token[:1] != b'"' or token[-1:] != b'"':
+            continue
+        if token[1:-1] != literal or b"\\" in token:
+            continue
+        slot_literal = json.dumps(rule["slot"], ensure_ascii=True)
+        message_literal = json.dumps(rule["slot"] + " must be set", ensure_ascii=True)
+        replacement = (
+            f"java.util.Objects.requireNonNull(java.lang.System.getenv({slot_literal}), {message_literal})"
+        ).encode("ascii")
+        edits.append((node.start_byte, node.end_byte, replacement))
+
+    if not edits:
+        return None, 0, bool(findings), original
+    rewritten = original
+    for start, end, replacement in sorted(edits, reverse=True):
+        rewritten = rewritten[:start] + replacement + rewritten[end:]
+    checked = parser.parse(rewritten)
+    if checked is None or checked.root_node.has_error:
+        raise ValueError(f"cannot safely transform {relative}: generated Java syntax is invalid")
+    return rewritten.decode("utf-8"), len(edits), len(edits) != len(by_location), original
+
+
 def apply_dynamic_resolutions(
     root: str | Path,
     policy: str | Path = ".udct-policy.json",
@@ -198,10 +658,10 @@ def apply_dynamic_resolutions(
     write: bool = False,
     confirm: str | None = None,
 ) -> ApplyReport:
-    """Prepare or explicitly write exact policy-backed Python rewrites.
+    """Prepare or explicitly write exact policy-backed Python, JS/TS, Go and Java rewrites.
 
     The default is a value-free preview. Writes are limited to a local Git root,
-    Python files with exact standalone string-token matches, and clean target files.
+    supported source files with exact syntax-backed matches, and clean targets.
     """
     root_text = str(root)
     if root_text.startswith(("https://", "http://", "git@")):
@@ -226,10 +686,24 @@ def apply_dynamic_resolutions(
         path = (repo / relative).resolve(strict=True)
         if not path.is_relative_to(repo):
             raise ValueError(f"tracked path escapes repository through a symlink: {relative}")
-        if path.suffix.lower() != ".py":
+        suffix = path.suffix.lower()
+        if suffix in {".py", ".pyi"}:
+            content, count, has_unresolved, original_bytes = _prepare_file(path, relative, rules, file_findings)
+        elif suffix in {".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx"}:
+            content, count, has_unresolved, original_bytes = _prepare_js_ts_file(
+                path, relative, rules, file_findings
+            )
+        elif suffix == ".go":
+            content, count, has_unresolved, original_bytes = _prepare_go_file(
+                path, relative, rules, file_findings
+            )
+        elif suffix == ".java":
+            content, count, has_unresolved, original_bytes = _prepare_java_file(
+                path, relative, rules, file_findings
+            )
+        else:
             unresolved.add(relative)
             continue
-        content, count, has_unresolved, original_bytes = _prepare_file(path, relative, rules, file_findings)
         if content is None:
             unresolved.add(relative)
             continue
