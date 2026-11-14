@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -124,7 +125,7 @@ def main(argv: list[str] | None = None) -> int:
     p_gen.add_argument("--json", action="store_true", help="Output as JSON")
 
     # 9. Top 0.001% Master Craft Audit (Mamet, Cadence, Causality, Status, Recursion)
-    p_craft = sub.add_parser("craft", help="Run top 0.001% master craft audit (Mamet, Sorkin cadence, causality, status).")
+    p_craft = sub.add_parser("craft", help="Run top 0.001%% master craft audit (Mamet, Sorkin cadence, causality, status).")
     p_craft.add_argument("file", type=Path, help="Path to screenplay file")
     p_craft.add_argument("--json", action="store_true", help="Output JSON structured report")
 
@@ -159,16 +160,143 @@ def main(argv: list[str] | None = None) -> int:
     p_udct = sub.add_parser("udct", help="Universal Deterministic Calculated Template engine: Output = T(calculated values).")
     p_udct.add_argument("--duration", type=float, default=10.0, help="Duration in seconds (e.g. 10.0)")
     p_udct.add_argument("--fps", type=int, default=30, help="Frames / steps per second (e.g. 30)")
-    p_udct.add_argument("--subject", default="Xoah", help="Universal subject name (Xoah, Ravenous, Camera, UI, Synth)")
-    p_udct.add_argument("--action", default="sprint", help="Action / verb (sprint, pan, modulate)")
+    p_udct.add_argument("--subject", default="Subject", help="Dynamic subject name")
+    p_udct.add_argument("--action", default="transit", help="Dynamic action / verb")
     p_udct.add_argument("--start", type=float, default=0.0, help="Start position scalar")
     p_udct.add_argument("--end", type=float, default=18.0, help="End position scalar")
     p_udct.add_argument("--easing", default="ease_in_out_cubic", choices=["linear", "ease_in_quad", "ease_out_quad", "ease_in_out_quad", "ease_in_cubic", "ease_out_cubic", "ease_in_out_cubic", "sinusoidal"], help="Mathematical easing curve")
     p_udct.add_argument("--camera-offset", type=float, default=0.17, help="Camera phase offset")
+    p_udct.add_argument("--intensity-min", type=float, default=0.1, help="Minimum calculated intensity")
+    p_udct.add_argument("--intensity-max", type=float, default=1.0, help="Maximum calculated intensity")
+    p_udct.add_argument("--intensity-cycles", type=float, default=1.0, help="Intensity oscillation cycles")
+    p_udct.add_argument("--camera-start-yaw", type=float, default=0.0, help="Camera orbit start yaw in degrees")
+    p_udct.add_argument("--camera-end-yaw", type=float, default=360.0, help="Camera orbit end yaw in degrees")
+    p_udct.add_argument("--camera-pitch-min", type=float, default=-15.0, help="Minimum camera pitch in degrees")
+    p_udct.add_argument("--camera-pitch-max", type=float, default=25.0, help="Maximum camera pitch in degrees")
+    p_udct.add_argument("--camera-distance", type=float, default=5.0, help="Camera orbit distance")
     p_udct.add_argument("--frames", nargs="+", type=int, default=[0, 150, 299], help="Specific frame indices to sample and render")
     p_udct.add_argument("--json", action="store_true", help="Output raw calculated state machine snapshots as JSON")
 
+    # 15. UDCT repository guard: policy-driven and read-only.
+    p_guard = sub.add_parser(
+        "audit-dynamic",
+        help="Find policy-declared hardcoded values in a local or GitHub repository; read-only.",
+    )
+    p_guard.add_argument("source", help="Local Git checkout or https://github.com/OWNER/REPOSITORY")
+    p_guard.add_argument("--policy", type=Path, default=Path(".udct-policy.json"),
+                         help="JSON policy path (local sources default to their .udct-policy.json)")
+    p_guard.add_argument("--ref", help="GitHub branch or tag to inspect; defaults to the repository default branch")
+    p_guard.add_argument("--json", action="store_true", help="Output deterministic JSON findings")
+
+    p_suggest = sub.add_parser(
+        "suggest-dynamic",
+        help="Suggest environment-backed resolutions for likely deployment-specific literals; read-only.",
+    )
+    p_suggest.add_argument("source", help="Local directory or https://github.com/OWNER/REPOSITORY")
+    p_suggest.add_argument("--ref", help="GitHub branch or tag to inspect")
+    suggest_output = p_suggest.add_mutually_exclusive_group()
+    suggest_output.add_argument("--json", action="store_true", help="Output deterministic JSON suggestions")
+    suggest_output.add_argument("--env-template", action="store_true", help="Output a value-free .env template")
+
+    p_plan = sub.add_parser(
+        "plan-dynamic",
+        help="Map policy-backed findings to reviewable language expressions without editing source.",
+    )
+    p_plan.add_argument("source", help="Local Git checkout or https://github.com/OWNER/REPOSITORY")
+    p_plan.add_argument("--policy", type=Path, default=Path(".udct-policy.json"), help="JSON policy path")
+    p_plan.add_argument("--ref", help="GitHub branch or tag to inspect")
+    p_plan.add_argument("--json", action="store_true", help="Output deterministic JSON plans")
+
+    p_apply = sub.add_parser(
+        "apply-dynamic",
+        help="Prepare exact policy-backed Python resolutions; --write explicitly edits clean local files.",
+    )
+    p_apply.add_argument("source", help="Local Git repository (remote URLs are read-only)")
+    p_apply.add_argument("--policy", type=Path, default=Path(".udct-policy.json"), help="JSON policy path")
+    p_apply.add_argument("--write", action="store_true", help="Write a previewed plan when paired with its --confirm ID")
+    p_apply.add_argument("--confirm", help="Plan ID printed by a fresh preview; binds approval to exact source contents")
+    p_apply.add_argument("--json", action="store_true", help="Output a value-free application report")
+
     args = parser.parse_args(argv)
+
+    if args.command == "audit-dynamic":
+        from nougenscript.sources import audit_dynamic_source
+
+        try:
+            findings = audit_dynamic_source(args.source, args.policy, args.ref)
+        except (OSError, ValueError) as exc:
+            print(f"audit-dynamic: {exc}", file=sys.stderr)
+            return 2
+        if args.json:
+            print(json.dumps([finding.to_dict() for finding in findings], sort_keys=True, indent=2))
+        elif findings:
+            for finding in findings:
+                print(f"{finding.path}:{finding.line}:{finding.column}: {finding.rule_id}: use {{{{{finding.slot}}}}} — {finding.rationale}")
+        else:
+            print("No policy-declared hardcoded values found in tracked files.")
+        return 1 if findings else 0
+
+    if args.command == "suggest-dynamic":
+        from nougenscript.dynamic_suggestions import render_environment_template, suggest_dynamic_literals
+
+        try:
+            suggestions = suggest_dynamic_literals(args.source, args.ref)
+        except (OSError, ValueError) as exc:
+            print(f"suggest-dynamic: {exc}", file=sys.stderr)
+            return 2
+        if args.env_template:
+            print(render_environment_template(suggestions), end="")
+        elif args.json:
+            print(json.dumps([item.to_dict() for item in suggestions], sort_keys=True, indent=2))
+        elif suggestions:
+            for item in suggestions:
+                resolution = item.resolution or "no safe standard expression for this file type"
+                import_hint = f" (add {item.required_import})" if item.required_import else ""
+                print(f"{item.path}:{item.line}:{item.column}: {item.symbol} -> {item.slot}: {resolution}{import_hint}")
+            print("Suggestions are advisory; review configuration semantics before editing source.")
+        else:
+            print("No likely deployment-specific assignments found.")
+        return 0
+
+    if args.command == "plan-dynamic":
+        from nougenscript.resolution_plan import plan_dynamic_resolutions
+
+        try:
+            plans = plan_dynamic_resolutions(args.source, args.policy, args.ref)
+        except (OSError, ValueError) as exc:
+            print(f"plan-dynamic: {exc}", file=sys.stderr)
+            return 2
+        if args.json:
+            print(json.dumps([item.to_dict() for item in plans], sort_keys=True, indent=2))
+        elif plans:
+            for item in plans:
+                expression = item.resolution or "manual resolution required for this file type"
+                import_hint = f" (add {item.required_import})" if item.required_import else ""
+                print(f"{item.path}:{item.line}:{item.column}: {{{{{item.slot}}}}} -> {expression}{import_hint}")
+            print("Plans are advisory; review every occurrence before applying a source change.")
+        else:
+            print("No policy-declared hardcoded values found in tracked files.")
+        return 0
+
+    if args.command == "apply-dynamic":
+        from nougenscript.dynamic_apply import apply_dynamic_resolutions
+
+        try:
+            report = apply_dynamic_resolutions(args.source, args.policy, write=args.write, confirm=args.confirm)
+        except (OSError, SyntaxError, ValueError, subprocess.SubprocessError) as exc:
+            print(f"apply-dynamic: {exc}", file=sys.stderr)
+            return 2
+        if args.json:
+            print(json.dumps(report.to_dict(), sort_keys=True, indent=2))
+        else:
+            action = "Updated" if report.written else "Prepared (no files changed)"
+            print(f"{action}: {report.replacements} exact Python literal(s) in {len(report.changed_files)} file(s).")
+            if report.changed_files:
+                print("Files: " + ", ".join(report.changed_files))
+            if report.unresolved:
+                print("Manual review required: " + ", ".join(report.unresolved))
+            print("Review the resulting code and provide the required environment variables before running it.")
+        return 0
 
     if args.command == "parse":
         text = args.file.read_text(encoding="utf-8")
@@ -703,6 +831,12 @@ def main(argv: list[str] | None = None) -> int:
             end_pos=(args.end, 0.0, 0.0),
             easing=EasingType(args.easing),
             camera_offset=args.camera_offset,
+            intensity_range=(args.intensity_min, args.intensity_max),
+            intensity_cycles=args.intensity_cycles,
+            camera_start_yaw=args.camera_start_yaw,
+            camera_end_yaw=args.camera_end_yaw,
+            camera_pitch_range=(args.camera_pitch_min, args.camera_pitch_max),
+            camera_distance=args.camera_distance,
         )
         states = UniversalDeterministicEngine.calculate_trajectory(cfg)
 
