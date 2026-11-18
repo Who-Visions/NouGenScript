@@ -1,45 +1,42 @@
-# 📜 NouGenScript: Universal Poly-Script Engine
+<!-- nougen-readme-compiler: v1 -->
 
-> **Organization**: Who-Visions & NouGenAi  
-> **Status**: Production Core Standard  
-> **Repository**: [`Who-Visions/NouGenScript`](https://github.com/Who-Visions/NouGenScript) & [`nougenai/NouGenScript`](https://github.com/nougenai/NouGenScript)  
+# 📜 NouGenScript
 
----
+Universal Poly-Script Engine: Movie, TV, Playwriting, Comic, Email, TypeScript, JavaScript, and Python scripts.
 
-## 🏛️ Prime Purpose & Vision
+## 📚 Contents
+- [Overview](#overview)
+- [Dual-Plane Invariant](#dual-plane-invariant)
+- [Quick Start](#quick-start)
+- [Universal Deterministic Calculated Templates (UDCT)](#universal-deterministic-calculated-templates-udct)
+- [Hardcode Audit](#hardcode-audit)
+- [File Architecture](#file-architecture)
+- [License](#license)
+
+## 🧠 Overview
+
 **NouGenScript** is the universal, mathematically grounded script engine for the NouGen fleet, Veilverse productions, marketing infrastructure, and engineering workflows.
 
 It handles **all script paradigms under one unified AST**:
+
 1. **Movie Screenplays**: Feature screenplays, Scene Headings (`INT./EXT.`), action beats, transitions, and dual-plane prompter streams.
-2. **Television Scripts**: Episodic TV, pilots, cold opens, multi-act structures (`ACT ONE` $\dots$ `ACT FIVE`), and tag stingers.
+2. **Television Scripts**: Episodic TV, pilots, cold opens, multi-act structures (`ACT ONE` … `ACT FIVE`), and tag stingers.
 3. **Playwriting & Theatre**: Stage plays, proscenium and black-box stage directions, character entrances/exits, and monologues.
 4. **Comic Book Scripts**: Page-by-page, panel-by-panel comic scripts with visual descriptions, dialogue balloons, captions, and SFX.
 5. **Email Outreach Scripts**: Marketing, cold outreach, and nurture sequences (Subject lines, Preview headers, Body, CTA buttons, and P.S. lines).
 6. **Creator Video Scripts**: Talking Head, Short-Form Reel, and YouTube Long-Form with 3-second hook directives, retention gates, and pattern interrupts.
 7. **Code Scripts (TypeScript, JavaScript, Python, Bash)**: Engineering scripts with syntax encapsulation, dependency detection, export tracking, and AST metadata.
-8. **Dual-Plane Script Architecture (`DisplayPlane != SpeechPlane`)**:
-   - Authored scripts decompose bijectively into talent-facing display elements (`DIRECTION`, `CUE`, `PAUSE`, `MEDIA`) and speech-recognition / voice-synthesis stream tokens (`SPOKEN`).
-9. **SPITE Psychological Depth Engine**:
-   - Character shadow-self tracking, volatility indices ($0.0 \dots 1.0$), teleological core motives, and subtext leakage detection across lines.
-10. **Deterministic Persona & Behavioral Masks (`persona.py`)**:
-   - 25 Composable behavioral masks including the **Dav1d Hip-Hop Mogul Voices** (`sosa`, `curtis`, `ye`, `hov`, `lupe`).
-   - 20-Pack emotional spectrum (`ecstatic` $\dots$ `enraged`) for delivery cues and somatic inflection.
-11. **Elite 0.001% Narrative Validators (`validators.py` & `narrative_craft.py`)**:
-   - **Mamet Auditing**: 3 non-negotiable scene questions (Objective, Stakes, Urgency).
-   - **Sorkin Cadence Analysis**: Dialogue velocity, turn distribution, repetition rhythms.
-   - **Thirty-Act Structure**: The Dav3 Standard 30-Act feature architecture with meta-bridges.
-   - **Mythic Noir Anti-Cliché**: MCU quip purge and somatic power-cost laws.
-   - **Causal Momentum**: 'Therefore' / 'But' vs 'And then' narrative propulsion.
-12. **Kaedra Continuity & Teleological Planning (`core.py`, `templates.py`)**:
-   - **ContinuityTracker**: Real-time state machine tracking props, active threads, locations, and character emotional parentheticals.
-   - **Backward-Causal Planning**: Reverse-engineering plotlines backwards from the locked ending.
-13. **Dav1d Bayesian Instinct Engine & Reasoning Sandwich (`instincts.py`, `sandwich.py`)**:
-   - **InstinctRecorder**: Asymptotically learned behavioral reflexes with Bayesian confidence scoring.
-   - **ReasoningSandwich**: 11-step outcome verification pipeline for production-ready screenplay assurance.
+8. **Dual-Plane Script Architecture (`DisplayPlane != SpeechPlane`)**: authored scripts decompose bijectively into talent-facing display elements (`DIRECTION`, `CUE`, `PAUSE`, `MEDIA`) and speech-recognition / voice-synthesis stream tokens (`SPOKEN`).
+9. **SPITE Psychological Depth Engine**: character shadow-self tracking, volatility indices (0.0 … 1.0), teleological core motives, and subtext leakage detection across lines.
+10. **Deterministic Persona & Behavioral Masks (`persona.py`)**: 25 composable behavioral masks including the **Dav1d Hip-Hop Mogul Voices** (`sosa`, `curtis`, `ye`, `hov`, `lupe`), and a 20-pack emotional spectrum (`ecstatic` … `enraged`) for delivery cues and somatic inflection.
+11. **Elite 0.001% Narrative Validators (`validators.py` & `narrative_craft.py`)**: Mamet Auditing (Objective, Stakes, Urgency); Sorkin Cadence Analysis; the Thirty-Act Structure (the Dav3 Standard 30-Act feature architecture with meta-bridges); Mythic Noir Anti-Cliché (MCU quip purge and somatic power-cost laws); Causal Momentum (‘Therefore’ / ‘But’ vs ‘And then’).
+12. **Kaedra Continuity & Teleological Planning (`core.py`, `templates.py`)**: `ContinuityTracker` (real-time state machine tracking props, active threads, locations, and character emotional parentheticals) and Backward-Causal Planning (reverse-engineering plotlines backwards from the locked ending).
+13. **Dav1d Bayesian Instinct Engine & Reasoning Sandwich (`instincts.py`, `sandwich.py`)**: `InstinctRecorder` (asymptotically learned behavioral reflexes with Bayesian confidence scoring) and `ReasoningSandwich` (11-step outcome verification pipeline for production-ready screenplay assurance).
 
----
+**Status**: Production Core Standard. **Organization**: Who-Visions & NouGenAi.
 
-## 📐 Dual-Plane Invariant
+## 📌 Dual-Plane Invariant
+
 ```
 Authored Script Source (Fountain / Markdown / YAML)
                      │
@@ -52,11 +49,10 @@ Authored Script Source (Fountain / Markdown / YAML)
 • Scene Headings            • Zero-Direction Latency Stream
 ```
 
----
-
-## 🚀 Quickstart
+## 🚀 Quick Start
 
 ### Python Engine
+
 ```python
 from nougenscript import (
     Screenplay,
@@ -94,6 +90,7 @@ char = CharacterPersona(
 ```
 
 ### CLI Usage
+
 ```bash
 # Elite Craft & Status Auditing
 nougenscript craft screenplay.fountain
@@ -112,13 +109,9 @@ nougenscript generate backward-plan --title "Veil City"
 nougenscript generate talking-head --topic "Zero-Cost Swarm Architecture"
 ```
 
-### Universal Deterministic Calculated Templates (UDCT)
+## 📌 Universal Deterministic Calculated Templates (UDCT)
 
-UDCT makes every output-affecting parameter explicit in `UniversalStateConfig`.
-The same configuration produces the same calculated frame states and canonical
-SHA-256 state hashes. Subject/action data, intensity curves, camera paths, and
-custom constants are configurable; unknown or malformed template slots fail
-instead of silently leaking into generated output.
+UDCT makes every output-affecting parameter explicit in `UniversalStateConfig`. The same configuration produces the same calculated frame states and canonical SHA-256 state hashes. Subject/action data, intensity curves, camera paths, and custom constants are configurable; unknown or malformed template slots fail instead of silently leaking into generated output.
 
 ```python
 from nougenscript.udct import UniversalDeterministicEngine, UniversalStateConfig
@@ -140,99 +133,31 @@ frames = UniversalDeterministicEngine.compile_full_sequence(
 )
 ```
 
-Dynamic values are inserted as text and are never evaluated. Encode untrusted
-values for the target language before using them in source-code templates.
+Dynamic values are inserted as text and are never evaluated. Encode untrusted values for the target language before using them in source-code templates.
 
-### Protect Git repositories from values that must be dynamic
+## 📌 Hardcode Audit
 
-UDCT also provides a deterministic, read-only hardcode audit. A generic scanner
-cannot safely tell whether a literal is a protocol constant or an
-environment-specific value, so each repository declares the values that must
-be dynamic in a checked-in `.udct-policy.json` file. The audit scans tracked
-Git files only, reports stable path/line/column/rule/slot results, and exits with
-status 1 on a finding. It never rewrites source files.
-
-```json
-{
-  "version": 1,
-  "rules": [
-    {
-      "id": "service-api-origin",
-      "literal": "https://api.example.invalid/v1",
-      "paths": ["src/**/*.py", "src/**/*.ts"],
-      "slot": "API_BASE_URL",
-      "rationale": "The API origin varies by deployment environment."
-    }
-  ]
-}
-```
-
-Point the command at a local checkout or GitHub repository. Remote repositories
-are shallow-cloned to a temporary directory, scanned as data, and removed when
-the command exits; no remote branch is changed. An explicit policy may live
-outside the target repository, which lets a user audit public source without
-adding configuration to it. Private GitHub access uses `GITHUB_TOKEN` from the
-process environment and never writes it to the checkout.
+UDCT also provides a deterministic, read-only hardcode audit. Each repository declares the values that must be dynamic in a checked-in `.udct-policy.json` file. The audit scans tracked Git files only, reports stable path/line/column/rule/slot results, and exits with status 1 on a finding. It never rewrites source files.
 
 ```bash
 nougenscript audit-dynamic . --json
-nougenscript audit-dynamic https://github.com/OWNER/REPOSITORY \
-  --ref main --policy ./review-policy.json --json
+nougenscript audit-dynamic https://github.com/OWNER/REPOSITORY --ref main --policy ./review-policy.json --json
 ```
 
-Findings identify the UDCT slot to use (for example, `{{API_BASE_URL}}`); a
-reviewer makes the source change explicitly and chooses the correct
-target-language configuration and escaping. Empty policies are valid. This is
-a policy-driven guard, not a heuristic ban on constants, a credentials
-scanner, or an automatic rewriter.
-
-To turn those exact policy matches into a deterministic, value-free plan, use
-`plan-dynamic`. It includes each location, slot, candidate expression, and any
-required import. Unknown file types are marked for manual resolution, and every
-plan entry requires review because a literal match may occur in a comment or a
-non-code context. It never edits the repository.
+`plan-dynamic` turns exact policy matches into a deterministic, value-free plan (location, slot, candidate expression, required import). Every plan entry requires review — a literal match may occur in a comment or a non-code context. It never edits the repository.
 
 ```bash
 nougenscript plan-dynamic . --json
 ```
 
-For local repositories, `apply-dynamic` has conservative Python,
-JavaScript/TypeScript, Go, and Java adapters for exact standalone string
-literals covered by the policy. Python changes skip comments, docstrings,
-annotations, and unmatched contexts. JavaScript/TypeScript, Go, and Java use
-bundled Tree-sitter grammars and only rewrite recognized runtime initializer
-contexts; escaped literals and unsupported expressions remain unresolved.
-JavaScript/TypeScript targets Node.js `process.env`; Go targets `os.LookupEnv`
-(adding the standard-library import when needed); Java targets a non-null
-`System.getenv` value using `java.util.Objects.requireNonNull`. Go constants
-and Java `final` or implicit interface constants remain unresolved. Review the
-target runtime and type behavior before applying. None of these adapters
-executes the repository. Without `--write`, the command
-prints a value-free preview and a plan ID bound to hashes of the exact
-source/result files. Review `plan-dynamic` and the preview, then pass that ID
-with `--write`. Writes change only clean targets and validate resulting syntax.
-Supply the named environment variables before running the application. GitHub
-URLs remain read-only: clone the repository locally before applying a change.
+`apply-dynamic` has conservative Python, JavaScript/TypeScript, Go, and Java adapters for exact standalone string literals covered by the policy. Without `--write` it prints a value-free preview and a plan ID bound to hashes of the exact source/result files; pass that ID with `--write` to apply. Writes change only clean targets and validate resulting syntax. GitHub URLs remain read-only: clone the repository locally before applying a change.
 
 ```bash
 nougenscript apply-dynamic ./service --json
 nougenscript apply-dynamic ./service --write --confirm PLAN_ID --json
 ```
 
-Automatic application is currently limited to the Python, Node.js-oriented
-JavaScript/TypeScript, Go, and Java contexts described above. Other languages
-receive reviewable resolution plans, but are not rewritten until UDCT has a
-language-aware adapter and syntax validation for them. Each adapter leaves
-unresolved syntax it cannot map confidently; reviewers must validate
-application-specific runtime behavior.
-
-For an initial read-only inventory without a policy, use `suggest-dynamic`.
-It looks for assignment-shaped service URLs, absolute paths, and operational
-limits, then reports likely environment-variable names and language-specific
-expressions where UDCT has a safe standard. It redacts URL credentials,
-queries, and paths from previews, ignores secret-named symbols and `.env`
-files, and does not edit source. Treat heuristic findings as review candidates;
-the owning project decides defaults, validation, and configuration semantics.
+`suggest-dynamic` gives a read-only inventory without a policy: it looks for assignment-shaped service URLs, absolute paths, and operational limits, then reports likely environment-variable names. It redacts URL credentials, queries, and paths from previews, ignores secret-named symbols and `.env` files, and does not edit source. Treat heuristic findings as review candidates.
 
 ```bash
 nougenscript suggest-dynamic ./service --json
@@ -240,9 +165,8 @@ nougenscript suggest-dynamic https://github.com/OWNER/REPOSITORY --ref main
 nougenscript suggest-dynamic ./service --env-template > .env.example
 ```
 
----
+## 🏗️ File Architecture
 
-## 📦 File Architecture
 - `src/nougenscript/core.py`: Canonical AST nodes (`Scene`, `Dialogue`, `Direction`, `Cue`, `ContinuityTracker`).
 - `src/nougenscript/dialects.py`: PolyScript domain matrix (`NARRATIVE_FILM`, `CREATOR_VIDEO`, `TELEVISION`, `THEATRE`, `COMIC_BOOK`, `EMAIL_CAMPAIGN`, `CODE_TYPESCRIPT`, `CODE_PYTHON`).
 - `src/nougenscript/engine.py`: Universal poly-script compiler, parser, and code encapsulator.
@@ -257,5 +181,11 @@ nougenscript suggest-dynamic ./service --env-template > .env.example
 - `src/nougenscript/cli.py`: Unified command-line interface with `sandwich`, `instinct`, `craft`, `generate`, and `poly`.
 - `tests/`: 75 comprehensive tests covering all engines and validators.
 
+## 📄 License
 
+Who Visions Source-Available License (v1.1) — see `LICENSE.md`. Note: `pyproject.toml` declares MIT, which does not match `LICENSE.md`; the license file is the authority here, and the mismatch needs the owner to resolve it.
 
+## 🔗 Links
+
+- [NouGenScript on GitHub (Who-Visions)](<https://github.com/Who-Visions/NouGenScript>)
+- [NouGenScript on GitHub (nougenai)](<https://github.com/nougenai/NouGenScript>)
